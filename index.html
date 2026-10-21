@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sea-state weather days for cruise planning</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/plotly.min.js"></script>
+  <script src="assets/calc.js"></script>
+  <script src="data/wave_data.js"></script>
+</head>
+<body>
+<header>
+  <h1>Sea-state weather days for cruise planning</h1>
+  <p class="sub">Time with significant wave height (Hs) above a chosen limit during a cruise window,
+    from moored buoys off the west coast of Vancouver Island. The same calendar window is evaluated
+    in every year with buoy data.</p>
+</header>
+
+<main>
+  <section class="controls" aria-label="Cruise inputs">
+    <div class="field">
+      <label for="startMonth">Cruise start</label>
+      <div class="row">
+        <select id="startMonth"></select>
+        <input id="startDay" type="number" min="1" max="31" value="15" aria-label="Start day">
+      </div>
+    </div>
+    <div class="field">
+      <label for="nDays">Cruise length (days)</label>
+      <input id="nDays" type="number" min="1" max="120" value="14">
+    </div>
+    <div class="field">
+      <label for="limit">Hs limit: <output id="limitOut"></output> m</label>
+      <input id="limit" type="range" min="2" max="3" step="0.05" value="2.5">
+    </div>
+    <div class="field">
+      <span class="label">Buoys</span>
+      <div id="stationBoxes" class="row wrap"></div>
+    </div>
+    <p id="windowNote" class="note"></p>
+  </section>
+
+  <section aria-label="Results">
+    <h2>Time above the limit</h2>
+    <div id="results"></div>
+    <p class="note">Equivalent days lost = fraction of measured time above the limit × cruise length.
+      Longest calm spell = longest unbroken period with data and Hs at or below the limit.
+      Rows marked <span class="partial">partial</span> have data for less than 80% of the window.</p>
+  </section>
+
+  <section aria-label="Wave height during the cruise window">
+    <h2>Hourly significant wave height in the cruise window</h2>
+    <div id="tsPlots"></div>
+  </section>
+
+  <section aria-label="Sensitivity to the limit">
+    <h2>Sensitivity to the limit</h2>
+    <div id="curvePlot" class="plot"></div>
+  </section>
+
+  <details>
+    <summary>Data and method</summary>
+    <ul>
+      <li>Hs is the hourly significant wave height from Fisheries and Oceans Canada, Marine Environmental
+        Data Section (MEDS), served through the CIOOS Pacific ERDDAP dataset <code>DFO_MEDS_BUOYS</code>.
+        Where available the MEDS quality-controlled value (VCAR) is used, otherwise the buoy-reported value
+        (VWH). Since mid-2022 only buoy-reported values exist and they have not been quality-controlled.</li>
+      <li>Values flagged erroneous or off-position, and values outside 0.2–20 m, are removed.</li>
+      <li>Hs is interpolated linearly between hourly samples across gaps of up to 2 h; longer gaps are
+        treated as missing. Exceedances that start and end between two hourly readings are not seen.</li>
+      <li>Dates are in UTC. Cruise windows are limited to the March–November season analysed.</li>
+      <li>This is a planning aid based on a short record (from 2024), not a forecast.</li>
+    </ul>
+  </details>
+</main>
+
+<footer>
+  <p>Data: Fisheries and Oceans Canada (MEDS) via CIOOS Pacific. Contains information licensed under the
+    Open Government Licence – Canada. <span id="updated"></span></p>
+</footer>
+<script src="assets/app.js"></script>
+</body>
+</html>

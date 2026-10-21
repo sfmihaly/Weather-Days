@@ -1,0 +1,22 @@
+{
+  "record_start": "2024-01-01",
+  "season": {"first_month": 3, "last_month": 11},
+  "stations": [
+    {
+      "id": "C46206",
+      "name": "La Perouse Bank",
+      "source": "cioos_dfo_meds",
+      "source_station_id": "C46206",
+      "lat": 48.83,
+      "lon": -126.00
+    },
+    {
+      "id": "C46132",
+      "name": "South Brooks",
+      "source": "cioos_dfo_meds",
+      "source_station_id": "C46132",
+      "lat": 49.78,
+      "lon": -127.88
+    }
+  ]
+}

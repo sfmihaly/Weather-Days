@@ -1,0 +1,32 @@
+:root { --ink: #1d2733; --muted: #5b6672; --line: #d9dee3; --bg: #ffffff; --panel: #f5f7f9; --accent: #1f5fa8; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.45; }
+header, main, footer { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+header { padding-top: 24px; }
+h1 { font-size: 1.6rem; margin: 0 0 6px; }
+h2 { font-size: 1.15rem; margin: 28px 0 8px; }
+.sub { color: var(--muted); margin: 0 0 12px; max-width: 820px; }
+.controls { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: flex-end; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label, .field .label { font-size: .85rem; font-weight: 600; color: var(--muted); }
+.row { display: flex; gap: 8px; align-items: center; }
+.wrap { flex-wrap: wrap; }
+select, input[type=number] { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 5px; background: #fff; }
+input[type=number] { width: 5.5em; }
+input[type=range] { width: 220px; accent-color: var(--accent); }
+.chk { display: inline-flex; gap: 5px; align-items: center; font-size: .95rem; }
+.note { color: var(--muted); font-size: .85rem; margin: 6px 0 0; flex-basis: 100%; }
+.note.warn { color: #9a4b00; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+th, td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+thead th { font-size: .8rem; color: var(--muted); font-weight: 600; border-bottom: 1.5px solid var(--ink); }
+tr.pooled td { font-weight: 600; background: var(--panel); }
+tr.nodata td { color: #9aa3ad; }
+.partial { color: #9a4b00; font-weight: 600; font-size: .8rem; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+.plot { width: 100%; min-height: 340px; }
+details { margin: 28px 0 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px; }
+summary { cursor: pointer; font-weight: 600; }
+footer { color: var(--muted); font-size: .8rem; padding-top: 18px; padding-bottom: 28px; }
+@media (max-width: 640px) { th, td { padding: 5px 6px; font-size: .82rem; } input[type=range] { width: 160px; } }
