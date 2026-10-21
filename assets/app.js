@@ -9,6 +9,8 @@
     curveMin: 1.0, curveMax: 4.0, curveStep: 0.1,    // x range of the sensitivity plot
     partialFrac: 0.8,                                 // flag rows with less data than this
     maxDays: 120,
+    fullDayH: 20,                                     // overview: a day counts if it has this many hours of data
+    runDays: 7,                                       // overview: running-mean length (days)
   };
   const YEAR_COLOURS = { 2024: "#1f5fa8", 2025: "#d9661f", 2026: "#6a3d9a" };
   const EXTRA_COLOURS = ["#2a9d8f", "#b5179e", "#8c564b", "#c9a227", "#264653", "#e76f51"];
@@ -33,6 +35,17 @@
   const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
   const fmtDate = ms => { const d = new Date(ms); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].slice(0, 3)}`; };
   const f1 = v => (v === null || isNaN(v)) ? "–" : v.toFixed(1);
+  // Plotly date strings carry no time zone; all times here are UTC.
+  const pdate = ms => new Date(ms).toISOString().slice(0, 19).replace("T", " ");
+  const parsePdate = s => {
+    if (typeof s === "number") return s;
+    let x = String(s).trim().replace(" ", "T");
+    if (x.length <= 10) x += "T00:00";
+    return Date.parse(x + "Z");
+  };
+  const SEASON_START = Date.UTC(REF_YEAR, firstMonth - 1, 1);
+  const SEASON_END = Date.UTC(REF_YEAR, lastMonth, 1);          // exclusive
+  const SEASON_DAYS = Math.round((SEASON_END - SEASON_START) / C.DAY);
 
   // ---- controls --------------------------------------------------------------
   const el = id => document.getElementById(id);
@@ -136,14 +149,14 @@
         const p = C.plotPoints(st.series, w.start, w.end);
         if (!p.x.length) continue;
         p.y.forEach(v => { if (v !== null && v > ymax) ymax = v; });
-        traces.push({ x: p.x.map(t => new Date(t - off).toISOString()), y: p.y, name: String(y), type: "scatter", mode: "lines",
+        traces.push({ x: p.x.map(t => pdate(t - off)), y: p.y, name: String(y), type: "scatter", mode: "lines",
           line: { color: yearColour(y), width: 1.6 }, connectgaps: false,
           hovertemplate: `${y} %{x|%d %b %H:%M} UTC<br>Hs %{y:.1f} m<extra></extra>` });
       }
       const layout = {
         title: { text: `${st.name} (${st.id})`, x: 0, xanchor: "left", font: { size: 14 } },
         height: 300, margin: { l: 55, r: 20, t: 36, b: 40 },
-        xaxis: { type: "date", tickformat: "%d %b", range: [new Date(ref.start).toISOString(), new Date(ref.end).toISOString()] },
+        xaxis: { type: "date", tickformat: "%d %b", range: [pdate(ref.start), pdate(ref.end)] },
         yaxis: { title: { text: "Hs (m)" }, rangemode: "tozero", range: [0, Math.max(5, Math.ceil(ymax + 0.5))] },
         shapes: [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: inp.limit, y1: inp.limit, line: { color: "#1d2733", width: 1.2, dash: "dash" } }],
         annotations: [{ xref: "paper", x: 1, y: inp.limit, yanchor: "bottom", xanchor: "right", showarrow: false,
@@ -176,6 +189,81 @@
     Plotly.react(el("curvePlot"), traces, layout, { displaylogo: false, responsive: true });
   }
 
+  // ---- overview: average daily hours above the limit, with a draggable cruise window ----
+  /** Daily mean (over selected buoys and all years) of hours with Hs above the limit, Mar–Nov. */
+  function overviewData(inp) {
+    const sum = new Float64Array(SEASON_DAYS), cnt = new Int32Array(SEASON_DAYS);
+    for (const st of inp.sel) for (const y of years) {
+      const y0 = Date.UTC(y, firstMonth - 1, 1);
+      for (let k = 0; k < SEASON_DAYS; k++) {
+        const a = y0 + k * C.DAY;
+        const ex = C.exceedance(st.series, a, a + C.DAY, inp.limit);
+        if (ex.coverage_h >= CONFIG.fullDayH) { sum[k] += 24 * ex.above_h / ex.coverage_h; cnt[k]++; }
+      }
+    }
+    const mean = Array.from(sum, (s, k) => cnt[k] ? s / cnt[k] : null);
+    const half = Math.floor(CONFIG.runDays / 2), need = Math.ceil(CONFIG.runDays / 2);
+    const run = mean.map((_, k) => {
+      let s = 0, n = 0;
+      for (let j = Math.max(0, k - half); j <= Math.min(SEASON_DAYS - 1, k + half); j++) if (mean[j] !== null) { s += mean[j]; n++; }
+      return n >= need ? s / n : null;
+    });
+    return { mean, run, cnt: Array.from(cnt) };
+  }
+
+  let rendering = false;
+  function renderOverview(inp) {
+    const div = el("overviewPlot");
+    const ov = overviewData(inp);
+    const w = C.cruiseWindow(REF_YEAR, inp.m, inp.d, inp.n, lastMonth);
+    const xs = ov.mean.map((_, k) => pdate(SEASON_START + k * C.DAY + C.DAY / 2));
+    const k0 = Math.round((w.start - SEASON_START) / C.DAY), k1 = Math.round((w.end - SEASON_START) / C.DAY);
+    const inWin = ov.mean.slice(k0, k1).filter(v => v !== null);
+    const winMean = inWin.length ? inWin.reduce((a, b) => a + b, 0) / inWin.length : null;
+    const nDays = k1 - k0;
+    const label = winMean === null ? "no data" :
+      `${fmtDate(w.start)} – ${fmtDate(w.end - 1)} (${nDays} d)<br>mean ${winMean.toFixed(1)} h/day above limit<br>≈ ${(winMean / 24 * nDays).toFixed(1)} days lost`;
+    const traces = [
+      { x: xs, y: ov.mean, type: "bar", name: "Daily mean", marker: { color: "#c9ced4" }, width: C.DAY * 0.95,
+        customdata: ov.cnt, hovertemplate: "%{x|%d %b}: %{y:.1f} h above limit<br>mean of %{customdata} buoy-years<extra></extra>" },
+      { x: xs, y: ov.run, type: "scatter", mode: "lines", name: `${CONFIG.runDays}-day running mean`,
+        line: { color: "#1d2733", width: 2.4 }, connectgaps: false, hoverinfo: "skip" },
+    ];
+    const layout = {
+      height: 330, margin: { l: 55, r: 20, t: 10, b: 40 }, bargap: 0,
+      xaxis: { type: "date", tickformat: "%b", dtick: "M1", range: [pdate(SEASON_START), pdate(SEASON_END)], fixedrange: true },
+      yaxis: { title: { text: `Hours above ${inp.limit.toFixed(2)} m per day` }, range: [0, 24.5], tickvals: [0, 6, 12, 18, 24], fixedrange: true },
+      shapes: [{ type: "rect", xref: "x", yref: "paper", x0: pdate(w.start), x1: pdate(w.end), y0: 0, y1: 1,
+                 fillcolor: "rgba(242,193,78,0.30)", line: { color: "#b8860b", width: 1.5 }, editable: true, layer: "below" }],
+      annotations: [{ xref: "x", yref: "paper", x: pdate((w.start + w.end) / 2), y: 1, yanchor: "top", showarrow: false,
+                      text: label, font: { size: 11, color: "#6b4e00" }, bgcolor: "rgba(255,255,255,0.75)" }],
+      legend: { orientation: "h", x: 0, y: -0.14 }, hovermode: "closest", dragmode: false,
+    };
+    rendering = true;
+    Plotly.react(div, traces, layout, { displaylogo: false, responsive: true, edits: { shapePosition: true } });
+    rendering = false;
+    if (!div._cruiseHandler) { div._cruiseHandler = true; div.on("plotly_relayout", onOverviewDrag); }
+  }
+
+  /** Dragging or resizing the shaded window sets the start date and length (snapped to whole days). */
+  function onOverviewDrag(ev) {
+    if (rendering || !ev) return;
+    let x0 = ev["shapes[0].x0"], x1 = ev["shapes[0].x1"];
+    if (x0 === undefined && x1 === undefined && Array.isArray(ev.shapes) && ev.shapes[0]) { x0 = ev.shapes[0].x0; x1 = ev.shapes[0].x1; }
+    if (x0 === undefined && x1 === undefined) return;
+    const inp = readInputs();
+    const cur = C.cruiseWindow(REF_YEAR, inp.m, inp.d, inp.n, lastMonth);
+    const t0 = x0 !== undefined ? parsePdate(x0) : cur.start, t1 = x1 !== undefined ? parsePdate(x1) : cur.end;
+    let s = Math.round((Math.min(t0, t1) - SEASON_START) / C.DAY), e = Math.round((Math.max(t0, t1) - SEASON_START) / C.DAY);
+    s = Math.min(Math.max(s, 0), SEASON_DAYS - 1);
+    e = Math.min(Math.max(e, s + 1), SEASON_DAYS, s + CONFIG.maxDays);
+    const d = new Date(SEASON_START + s * C.DAY);
+    startMonth.value = d.getUTCMonth() + 1;
+    startDay.value = d.getUTCDate();
+    nDaysIn.value = e - s;
+    update();
+  }
+
   // ---- update loop ------------------------------------------------------------
   let pending = false;
   function update() {
@@ -185,6 +273,7 @@
       const inp = readInputs();
       el("limitOut").textContent = inp.limit.toFixed(2);
       renderWindowNote(inp);
+      renderOverview(inp);
       renderTable(evaluate(inp));
       renderTimeSeries(inp);
       renderCurve(inp);
