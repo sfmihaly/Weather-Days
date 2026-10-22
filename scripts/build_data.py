@@ -79,6 +79,7 @@ def main():
         "generated_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "record_start": cfg["record_start"],
         "season": cfg["season"],
+        "map": cfg.get("map", {}),
         "units": "Hs in decimetres on an hourly UTC grid starting at t0; null = no data",
         "stations": [],
     }

@@ -264,6 +264,54 @@
     update();
   }
 
+  // ---- map: buoys and reference sites on GEBCO bathymetry ----------------------
+  const GEBCO_TILES = "https://wms.gebco.net/mapserv?service=WMS&request=GetMap&version=1.3.0&layers=GEBCO_LATEST" +
+    "&styles=&format=image/png&crs=EPSG:3857&width=256&height=256&bbox={bbox-epsg-3857}";
+  const MAP = D.map || {};
+  function renderMap(inp) {
+    const div = el("mapPlot");
+    if (!div) return;
+    const sel = new Set(inp.sel.map(s => s.id));
+    const refs = MAP.reference_sites || [];
+    const traces = [];
+    if (refs.length) traces.push({
+      type: "scattermap", mode: "markers", name: MAP.reference_sites_label || "Reference site",
+      lat: refs.map(r => r.lat), lon: refs.map(r => r.lon), text: refs.map(r => r.name),
+      marker: { symbol: "square", size: 14, color: "#ffcc00" },
+      hovertemplate: "%{text}<br>%{lat:.3f} N, %{customdata:.3f} W<extra></extra>",
+      customdata: refs.map(r => -r.lon),
+    });
+    const order = stations.map((s, k) => k);
+    traces.push({
+      type: "scattermap", mode: "markers+text", name: "Wave buoy",
+      lat: order.map(k => stations[k].lat), lon: order.map(k => stations[k].lon),
+      text: order.map(k => stations[k].id), textposition: "top right",
+      textfont: { size: 12, color: "#1d2733" },
+      customdata: order.map(k => [k, stations[k].name, -stations[k].lon]),
+      marker: { size: 16, color: order.map(k => sel.has(stations[k].id) ? "#d1495b" : "#9aa3ad") },
+      hovertemplate: "%{customdata[1]} (%{text})<br>%{lat:.2f} N, %{customdata[2]:.2f} W<br>click to include / exclude<extra></extra>",
+    });
+    const layout = {
+      height: 330, margin: { l: 0, r: 0, t: 0, b: 0 }, showlegend: true,
+      legend: { x: 0.01, y: 0.01, xanchor: "left", yanchor: "bottom", bgcolor: "rgba(255,255,255,0.8)", font: { size: 11 } },
+      map: {
+        style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "#dfe7ee" } }] },
+        center: MAP.center || { lat: 48.75, lon: -127.0 }, zoom: MAP.zoom || 5.6,
+        layers: [{ sourcetype: "raster", source: [GEBCO_TILES], below: "traces" }],
+      },
+    };
+    Plotly.react(div, traces, layout, { displaylogo: false, responsive: true, scrollZoom: true });
+    if (!div._clickHandler) {
+      div._clickHandler = true;
+      div.on("plotly_click", ev => {
+        const p = ev && ev.points && ev.points[0];
+        if (!p || !Array.isArray(p.customdata)) return;          // ignore reference sites
+        const box = boxes.querySelector(`input[value="${p.customdata[0]}"]`);
+        if (box) { box.checked = !box.checked; update(); }
+      });
+    }
+  }
+
   // ---- update loop ------------------------------------------------------------
   let pending = false;
   function update() {
@@ -273,6 +321,7 @@
       const inp = readInputs();
       el("limitOut").textContent = inp.limit.toFixed(2);
       renderWindowNote(inp);
+      renderMap(inp);
       renderOverview(inp);
       renderTable(evaluate(inp));
       renderTimeSeries(inp);

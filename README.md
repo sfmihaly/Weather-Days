@@ -69,6 +69,18 @@ NOAA NDBC) needs a fetch function in `scripts/build_data.py`, registered in `SOU
 To include earlier years, change `record_start` in `stations.json`. New years get colours
 automatically.
 
+## Map
+
+The map beside the inputs shows the buoys (circles; click one to include or exclude it) and the
+ONC NEPTUNE nodes (squares) on GEBCO shaded bathymetry.
+
+- The node list is in `stations.json` under `map.reference_sites`. Positions come from the ONC
+  Oceans 3.0 API (`/api/locations`).
+- The initial view is set by `map.center` and `map.zoom`.
+- After editing these, run `python scripts/build_data.py`.
+- The bathymetry tiles load from the GEBCO Web Map Service, so they need an internet connection.
+  Offline, the markers still show on a plain background.
+
 ## Method
 
 - Hs comes from Fisheries and Oceans Canada, Marine Environmental Data Section (MEDS), via the CIOOS

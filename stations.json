@@ -1,6 +1,18 @@
 {
   "record_start": "2024-01-01",
   "season": {"first_month": 3, "last_month": 11},
+  "map": {
+    "center": {"lat": 48.75, "lon": -127.0},
+    "zoom": 5.6,
+    "reference_sites_label": "ONC NEPTUNE node",
+    "reference_sites": [
+      {"name": "Folger Passage", "onc_code": "FGPD", "lat": 48.8138, "lon": -125.2806},
+      {"name": "Barkley Canyon", "onc_code": "BACND", "lat": 48.3457, "lon": -126.1579},
+      {"name": "Clayoquot Slope (ODP 889)", "onc_code": "NC89", "lat": 48.6706, "lon": -126.8480},
+      {"name": "Cascadia Basin (ODP 1027)", "onc_code": "CBC27", "lat": 47.7564, "lon": -127.7317},
+      {"name": "Endeavour", "onc_code": "KEMF", "lat": 47.9488, "lon": -129.0984}
+    ]
+  },
   "stations": [
     {
       "id": "C46206",

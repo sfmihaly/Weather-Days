@@ -18,6 +18,7 @@
 </header>
 
 <main>
+  <div class="top">
   <section class="controls" aria-label="Cruise inputs">
     <div class="field">
       <label for="startMonth">Cruise start</label>
@@ -40,6 +41,11 @@
     </div>
     <p id="windowNote" class="note"></p>
   </section>
+  <section class="mapPanel" aria-label="Map of buoys">
+    <div id="mapPlot"></div>
+    <p class="note">Click a buoy to include or exclude it. Bathymetry: GEBCO.</p>
+  </section>
+  </div>
 
   <section aria-label="Overview">
     <h2>Overview: choosing the cruise window</h2>
@@ -84,7 +90,8 @@
 
 <footer>
   <p>Data: Fisheries and Oceans Canada (MEDS) via CIOOS Pacific. Contains information licensed under the
-    Open Government Licence – Canada. <span id="updated"></span></p>
+    Open Government Licence – Canada. Bathymetry: GEBCO Compilation Group, GEBCO grid, via the GEBCO Web Map Service.
+    NEPTUNE node positions: Ocean Networks Canada. <span id="updated"></span></p>
 </footer>
 <script src="assets/app.js"></script>
 </body>
