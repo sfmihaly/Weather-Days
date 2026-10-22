@@ -105,4 +105,7 @@ ONC NEPTUNE nodes (squares) on GEBCO shaded bathymetry.
 Data: Fisheries and Oceans Canada (MEDS) via CIOOS Pacific. Contains information licensed under the
 Open Government Licence – Canada.
 
+Bathymetry: GEBCO Compilation Group, GEBCO grid, served by the GEBCO Web Map Service
+(free to use with attribution). NEPTUNE node positions: Ocean Networks Canada.
+
 Code licence: to be decided by ONC.
