@@ -93,6 +93,8 @@ def main():
         out["stations"].append({
             "id": st["id"], "name": st["name"], "lat": st["lat"], "lon": st["lon"],
             "source": st["source"], "t0": t0, "last_obs_utc": last, "hs_dm": dm,
+            # optional display fields
+            **{k: st[k] for k in ("default_selected", "summary", "notes") if k in st},
         })
     data_dir = ROOT / "data"
     data_dir.mkdir(exist_ok=True)

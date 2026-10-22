@@ -57,9 +57,14 @@
   const boxes = el("stationBoxes");
   stations.forEach((s, k) => {
     const lab = document.createElement("label"); lab.className = "chk";
-    lab.innerHTML = `<input type="checkbox" value="${k}" checked> ${s.name} (${s.id})`;
+    const on = s.default_selected !== false;
+    lab.innerHTML = `<input type="checkbox" value="${k}"${on ? " checked" : ""}> ${s.name} (${s.id})${s.notes ? " *" : ""}`;
     boxes.appendChild(lab);
   });
+  // notes for buoys that need them (e.g. offshore or incomplete records)
+  el("stationNotes").innerHTML = stations.filter(s => s.summary || (s.notes && s.notes.length)).map(s =>
+    `<p><b>* ${s.name} (${s.id}):</b> ${s.summary || ""}</p>` +
+    (s.notes && s.notes.length ? `<ul>${s.notes.map(n => `<li>${n}</li>`).join("")}</ul>` : "")).join("");
   const last = stations.map(s => s.last_obs_utc).filter(Boolean).sort().pop();
   el("updated").textContent = `Data file built ${D.generated_utc}; latest observation ${last}.`;
 
@@ -268,9 +273,26 @@
   const GEBCO_TILES = "https://wms.gebco.net/mapserv?service=WMS&request=GetMap&version=1.3.0&layers=GEBCO_LATEST" +
     "&styles=&format=image/png&crs=EPSG:3857&width=256&height=256&bbox={bbox-epsg-3857}";
   const MAP = D.map || {};
+  /** Centre and zoom that fit every buoy and reference site in the map div (MapLibre: 512-px world at zoom 0). */
+  function mapView(div) {
+    if (MAP.center && MAP.zoom) return { center: MAP.center, zoom: MAP.zoom };
+    const pts = stations.map(s => [s.lat, s.lon]).concat((MAP.reference_sites || []).map(r => [r.lat, r.lon]));
+    const pad = MAP.fit_padding_deg ?? 0.8;
+    const lats = pts.map(p => p[0]), lons = pts.map(p => p[1]);
+    const W = Math.min(...lons) - pad, E = Math.max(...lons) + pad;
+    const S = Math.min(...lats) - pad, N = Math.max(...lats) + pad;
+    const merc = lat => Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
+    const w = div.clientWidth || 640, h = div.clientHeight || 460;
+    const zx = Math.log2(w * 360 / (512 * (E - W)));
+    const zy = Math.log2(h * 2 * Math.PI / (512 * (merc(N) - merc(S))));
+    const lat = Math.atan(Math.sinh((merc(N) + merc(S)) / 2)) * 180 / Math.PI;
+    return { center: { lat, lon: (W + E) / 2 }, zoom: Math.max(1, Math.min(zx, zy, 10)) };
+  }
+  let mapViewCache = null;
   function renderMap(inp) {
     const div = el("mapPlot");
     if (!div) return;
+    if (!mapViewCache) mapViewCache = mapView(div);
     const sel = new Set(inp.sel.map(s => s.id));
     const refs = MAP.reference_sites || [];
     const traces = [];
@@ -287,16 +309,16 @@
       lat: order.map(k => stations[k].lat), lon: order.map(k => stations[k].lon),
       text: order.map(k => stations[k].id), textposition: "top right",
       textfont: { size: 12, color: "#1d2733" },
-      customdata: order.map(k => [k, stations[k].name, -stations[k].lon]),
+      customdata: order.map(k => [k, stations[k].name, -stations[k].lon, stations[k].summary ? "<br>" + stations[k].summary : ""]),
       marker: { size: 16, color: order.map(k => sel.has(stations[k].id) ? "#d1495b" : "#9aa3ad") },
-      hovertemplate: "%{customdata[1]} (%{text})<br>%{lat:.2f} N, %{customdata[2]:.2f} W<br>click to include / exclude<extra></extra>",
+      hovertemplate: "%{customdata[1]} (%{text})<br>%{lat:.2f} N, %{customdata[2]:.2f} W%{customdata[3]}<br>click to include / exclude<extra></extra>",
     });
     const layout = {
-      height: 330, margin: { l: 0, r: 0, t: 0, b: 0 }, showlegend: true,
+      height: div.clientHeight || 460, margin: { l: 0, r: 0, t: 0, b: 0 }, showlegend: true, uirevision: "map",
       legend: { x: 0.01, y: 0.01, xanchor: "left", yanchor: "bottom", bgcolor: "rgba(255,255,255,0.8)", font: { size: 11 } },
       map: {
         style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "#dfe7ee" } }] },
-        center: MAP.center || { lat: 48.75, lon: -127.0 }, zoom: MAP.zoom || 5.6,
+        center: mapViewCache.center, zoom: mapViewCache.zoom, uirevision: "map",
         layers: [{ sourcetype: "raster", source: [GEBCO_TILES], below: "traces" }],
       },
     };

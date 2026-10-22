@@ -23,6 +23,11 @@ It is a planning aid based on a short record (from 2024), not a forecast.
 |---|---|---|
 | C46206 | La Perouse Bank | 48.83 N, 126.00 W |
 | C46132 | South Brooks | 49.78 N, 127.88 W |
+| C46036 | South Nomad (open ocean; not included by default) | 48.35 N, 133.94 W |
+
+South Nomad has no complete March–November season yet and a 10-month gap (mid-August 2024 to
+mid-June 2025). Its wave heights run about 22% higher than at La Perouse Bank and 8% higher than at
+South Brooks, and its sea states lead South Brooks by about 9 h and La Perouse Bank by about 15 h.
 
 ## Repository layout
 
@@ -61,6 +66,10 @@ also run it by hand from the Actions tab.
     "source_station_id": "C46207", "lat": 50.87, "lon": -129.92}
    ```
    (Check the station's position before adding it.)
+   Optional fields:
+   - `"default_selected": false` leaves the buoy unticked when the page opens.
+   - `"summary"` is a one-line description, shown in the map hover and the notes under the inputs.
+   - `"notes"` is a list of caveats shown under the inputs.
 2. Run `python scripts/build_data.py`, or let the weekly workflow run.
 
 The new buoy appears in the dashboard automatically. A buoy from another data source (for example
@@ -76,7 +85,8 @@ ONC NEPTUNE nodes (squares) on GEBCO shaded bathymetry.
 
 - The node list is in `stations.json` under `map.reference_sites`. Positions come from the ONC
   Oceans 3.0 API (`/api/locations`).
-- The initial view is set by `map.center` and `map.zoom`.
+- The initial view fits all buoys and nodes automatically, with a margin of `map.fit_padding_deg`
+  degrees. To fix the view instead, set `map.center` and `map.zoom`.
 - After editing these, run `python scripts/build_data.py`.
 - The bathymetry tiles load from the GEBCO Web Map Service, so they need an internet connection.
   Offline, the markers still show on a plain background.

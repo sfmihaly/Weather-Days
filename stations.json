@@ -2,8 +2,7 @@
   "record_start": "2024-01-01",
   "season": {"first_month": 3, "last_month": 11},
   "map": {
-    "center": {"lat": 48.75, "lon": -127.0},
-    "zoom": 5.6,
+    "fit_padding_deg": 0.8,
     "reference_sites_label": "ONC NEPTUNE node",
     "reference_sites": [
       {"name": "Folger Passage", "onc_code": "FGPD", "lat": 48.8138, "lon": -125.2806},
@@ -29,6 +28,22 @@
       "source_station_id": "C46132",
       "lat": 49.78,
       "lon": -127.88
+    },
+    {
+      "id": "C46036",
+      "name": "South Nomad",
+      "source": "cioos_dfo_meds",
+      "source_station_id": "C46036",
+      "lat": 48.35,
+      "lon": -133.94,
+      "default_selected": false,
+      "summary": "Open-ocean buoy about 590 km west of La Perouse Bank; not included by default.",
+      "notes": [
+        "No complete March–November season yet.",
+        "No wave data from mid-August 2024 to mid-June 2025 (a 10-month gap).",
+        "Wave heights run about 22% higher than at La Perouse Bank and 8% higher than at South Brooks.",
+        "Sea states lead South Brooks by about 9 h and La Perouse Bank by about 15 h, so it gives early warning of incoming weather."
+      ]
     }
   ]
 }
