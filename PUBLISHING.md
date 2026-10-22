@@ -72,26 +72,63 @@ The workflow `.github/workflows/update-data.yml` refreshes the buoy data every M
 3. GitHub may pause scheduled workflows in a repository that has had no activity for 60 days. If
    that happens, re-enable it from the Actions tab.
 
-## 7. Day-to-day, and moving to ONC later
+## 7. Updating the site (the routine)
 
-After changing anything (or after I change something):
+The weekly job adds its own "Update buoy data" commits on GitHub, so your folder falls behind.
+Always start with `git pull`.
 
 ```
-git status
-git add -A
-git commit -m "Short description of the change"
+cd /Users/smihaly/Analysis/Claude/wave_dashboard
+git pull                                    # bring in commits from GitHub (e.g. the weekly data)
+# ... make the changes ...
+git status                                  # which files changed
+git diff                                    # optional: the changed lines (q to quit)
+git add -A                                  # stage all changes (or name files: git add stations.json)
+git commit -m "Short description"           # save a snapshot locally
+git push                                    # upload to GitHub
+```
+
+GitHub Pages republishes about a minute after each push.
+
+### Useful extras
+
+| Situation | Command | What it does |
+|---|---|---|
+| See the history | `git log --oneline` | One line per commit, newest first (q to quit) |
+| See what one commit changed | `git show <commit-id> --stat` | The files that commit changed |
+| Throw away an uncommitted edit | `git restore <file>` | Puts the file back as it was at the last commit. This can't be undone. |
+| Unstage a file added by mistake | `git restore --staged <file>` | Takes it out of the next commit; the edit itself stays |
+| Behind or ahead of GitHub? | `git status` (first line) | E.g. "Your branch is behind 'origin/main' by 1 commit" |
+| Refresh the data now | `python scripts/build_data.py` | Rebuilds the data files; then add, commit and push |
+
+### If `git push` is refused
+
+A message like *"Updates were rejected because the remote contains work that you do not have
+locally"* means a weekly data commit arrived after your last pull. Run:
+
+```
+git pull
 git push
 ```
 
-GitHub Pages republishes automatically after each push.
+If `git pull` opens an editor with a message such as "Merge branch 'main'", save and close it. In
+the default editor (vim), type `:wq` and press Enter.
+
+### When your token expires
+
+`git push` asks for a username and password again. Create a new fine-grained token as before
+(Weather-Days only; Contents and Workflows read and write), enter `sfmihaly` as the username and
+paste the token as the password. The macOS keychain saves it again.
+
+## 8. Moving to ONC later
 
 **Moving a repository from your account to the ONC organisation:** Settings → General → Danger Zone
 → **Transfer ownership**. The history moves with it. The Pages address changes to
-`https://ONC-ORG.github.io/wave-weather-days/`, so share the new link. Afterwards, update this
+`https://ONC-ORG.github.io/Weather-Days/`, so share the new link. Afterwards, update this
 folder's link with:
 
 ```
-git remote set-url origin https://github.com/ONC-ORG/wave-weather-days.git
+git remote set-url origin https://github.com/ONC-ORG/Weather-Days.git
 ```
 
 ## Still to decide (ONC)
