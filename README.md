@@ -13,7 +13,8 @@ The dashboard applies that calendar window to every year with buoy data and show
 - the hourly Hs in the window for each year, with the limit marked;
 - the hours above the limit, the percentage of measured time, the equivalent days lost and the
   longest calm spell, per buoy and year, plus all years pooled;
-- how the percentage of time above the limit changes between 1 and 4 m.
+- how the percentage of time above the limit changes between 1 and 4 m;
+- a PDF report for each buoy (below).
 
 It is a planning aid based on a short record (from 2024), not a forecast.
 
@@ -25,42 +26,83 @@ It is a planning aid based on a short record (from 2024), not a forecast.
 | C46132 | South Brooks | 49.78 N, 127.88 W |
 | C46036 | South Nomad (open ocean; not included by default) | 48.35 N, 133.94 W |
 
-South Nomad has no complete March–November season yet and a 10-month gap (mid-August 2024 to
-mid-June 2025). Its wave heights run about 22% higher than at La Perouse Bank and 8% higher than at
-South Brooks, and its sea states lead South Brooks by about 9 h and La Perouse Bank by about 15 h.
+Facts such as complete seasons, data gaps and how each buoy compares with the others are
+calculated every week, and shown in the dashboard notes and the reports.
 
 ## Repository layout
 
 ```
-index.html                  the dashboard (open directly in a browser, or serve with GitHub Pages)
+index.html                  the dashboard
 assets/app.js               interface, table and plots
 assets/calc.js              exceedance calculations (also runs under Node for testing)
 assets/style.css
 assets/plotly.min.js        Plotly.js 4.1.2, bundled so the page needs no external CDN (MIT, see PLOTLY_LICENSE.txt)
-data/wave_data.js           hourly Hs for all buoys (generated; loaded by index.html)
-data/wave_data.json         same content as JSON (generated)
-stations.json               list of buoys and the record start date
-scripts/build_data.py       downloads, cleans and writes the data files
-.github/workflows/update-data.yml   weekly job that refreshes the data
+assets/bathymetry.jpg/.json GEBCO background image for the map, and the extent it covers
+stations.json               the buoys, map settings and hand-written report notes (one list for everything)
+scripts/wavecommon.py       download, cleaning and data facts, shared by the dashboard and the reports
+scripts/build_data.py       builds data/wave_data.js for the dashboard
+scripts/build_site.py       builds everything: data, reports and the _site/ folder that is published
+reports/wavereports.py      builds the PDF report for each buoy
+requirements.txt            Python packages (versions pinned)
+.github/workflows/update-data.yml   "Build and publish": weekly, and after every push
 ```
+
+Generated, and not stored in git:
+- `data/` (`wave_data.js`, `wave_data.json`, `raw/`);
+- `reports/pdf/` (latest PDFs, fixed names);
+- `reports/output/` (PDFs, figures and CSV tables per buoy);
+- `_site/`.
 
 ## Publishing
 
-See [PUBLISHING.md](PUBLISHING.md) for putting the dashboard on GitHub and turning on GitHub Pages.
+See [PUBLISHING.md](PUBLISHING.md) for GitHub, GitHub Pages and the day-to-day git routine.
 
-## Viewing locally
-
-Open `index.html` in a browser. All data is loaded from local files, so no server is needed.
-
-## Updating the data
+## Building and viewing locally
 
 ```
-pip install -r requirements.txt
-python scripts/build_data.py
+pip install -r requirements.txt     # once
+python scripts/build_site.py        # download fresh data; build data, reports and _site/ (about 1–2 min)
 ```
 
-On GitHub the workflow `Update buoy data` does this every Monday and commits the new data. You can
-also run it by hand from the Actions tab.
+Then open `index.html` in a browser. The data and the report links all work from the folder; no
+server is needed. Options:
+- `--no-reports`: only the dashboard data (quicker).
+- `--from-raw`: reuse the last download in `data/raw/`.
+
+On GitHub, the workflow **Build and publish** does the same every Monday, and after every push to
+`main`, and publishes `_site/` to GitHub Pages. Nothing is committed back. If a step fails (for
+example the data server is down), nothing is published and the previous site stays online. GitHub
+emails the repository owner about the failed run.
+
+## Reports
+
+`reports/wavereports.py` makes a 7-page PDF for each buoy:
+- the daily time with Hs above 2.00, 2.25, 2.50, 2.75 and 3.00 m, for 1 March – 30 November of every
+  year (season figure and nine monthly figures);
+- a monthly summary table;
+- key results;
+- data and method;
+- caveats.
+
+Calculated on every run:
+- the key results;
+- the coverage of each year and any gaps longer than 30 days;
+- the automated screening (low values, spikes, sudden jumps, stuck values);
+- the comparison with the three nearest other buoys: median ratio of hourly Hs, correlation, and the
+  lead or lag that best lines up the two records.
+
+Hand-written text, which is not recalculated, lives under `report` in `stations.json`:
+- `data_notes`: added to the data-quality bullet, e.g. an explanation of a storm spike;
+- `key_results_extra`: extra key-result bullets;
+- `caveats_extra`: buoy-specific caveats, e.g. exposure.
+
+Check this text from time to time, as the data grow.
+
+```
+python reports/wavereports.py               # all buoys (downloads fresh data)
+python reports/wavereports.py --from-raw    # reuse data/raw (after build_data.py)
+python reports/wavereports.py C46132        # one buoy (the others are still loaded for comparisons)
+```
 
 ## Adding a buoy
 
@@ -73,11 +115,16 @@ also run it by hand from the Actions tab.
    Optional fields:
    - `"default_selected": false` leaves the buoy unticked when the page opens.
    - `"summary"` is a one-line description, shown in the map hover and the notes under the inputs.
-   - `"notes"` is a list of caveats shown under the inputs.
-2. Run `python scripts/build_data.py`, or let the weekly workflow run.
+     Buoys with a summary or notes also show their calculated facts there.
+   - `"notes"` is a list of hand-written notes shown under the inputs.
+   - `"report"` holds `data_notes`, `key_results_extra` and `caveats_extra` for its PDF (see Reports).
+2. Run `python scripts/build_site.py`. A new buoy usually widens the map, so this also downloads a new
+   bathymetry image. Commit `stations.json` together with `assets/bathymetry.jpg` and
+   `assets/bathymetry.json`, then push.
 
-The new buoy appears in the dashboard automatically. A buoy from another data source (for example
-NOAA NDBC) needs a fetch function in `scripts/build_data.py`, registered in `SOURCES`.
+The new buoy then appears in the dashboard, gets its own report, and is included in the other
+buoys' comparisons. A buoy from another data source (for example NOAA NDBC) needs its own download
+function in `scripts/wavecommon.py`.
 
 To include earlier years, change `record_start` in `stations.json`. New years get colours
 automatically.
@@ -93,7 +140,7 @@ ONC NEPTUNE nodes (squares) on GEBCO shaded bathymetry.
   degrees. To fix the extent instead, set `map.extent` to `[west, east, south, north]`.
 - The bathymetry is one image, `assets/bathymetry.jpg`, downloaded from the GEBCO Web Map Service
   by `scripts/build_data.py` for that extent. It is stored in the repository, so the map works
-  offline and does not depend on GEBCO's server when someone opens the page.
+  offline, and the weekly build does not depend on GEBCO's server.
 - `assets/bathymetry.json` records the extent the image covers. The image is downloaded again only
   when that extent changes, e.g. after adding a buoy or node. If GEBCO cannot be reached, the
   previous image and its extent are kept, so the background still lines up with the markers.
@@ -107,7 +154,8 @@ ONC NEPTUNE nodes (squares) on GEBCO shaded bathymetry.
   - The MEDS quality-controlled value (VCAR) is used where available, otherwise the buoy-reported
     value (VWH).
   - Since mid-2022 only buoy-reported values exist, and these have not been quality-controlled.
-- Values flagged erroneous (4) or off position (7), and values outside 0.2–20 m, are removed.
+- Values flagged erroneous (4) or off position (7), and values outside 0.2–20 m, are removed. The
+  rules are in `scripts/wavecommon.py` and apply to both the dashboard and the reports.
 - Samples are placed on an hourly UTC grid.
 - Hs is interpolated linearly between samples across gaps of up to 2 h; longer gaps are treated as
   missing.

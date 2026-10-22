@@ -1,3 +1,8 @@
-numpy
-pandas
-requests
+# Versions tested with this code (Oct 2026). Pinned so the weekly build is not broken, or its
+# rounding changed, by a new library release. Update deliberately and re-check the reports.
+numpy==2.4.6
+pandas==2.3.3
+requests==2.34.2
+matplotlib==3.11.2
+reportlab==5.0.1
+pillow==12.3.0

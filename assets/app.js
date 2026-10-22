@@ -62,9 +62,15 @@
     boxes.appendChild(lab);
   });
   // notes for buoys that need them (e.g. offshore or incomplete records)
-  el("stationNotes").innerHTML = stations.filter(s => s.summary || (s.notes && s.notes.length)).map(s =>
-    `<p><b>* ${s.name} (${s.id}):</b> ${s.summary || ""}</p>` +
-    (s.notes && s.notes.length ? `<ul>${s.notes.map(n => `<li>${n}</li>`).join("")}</ul>` : "")).join("");
+  // one PDF per buoy, rebuilt weekly by reports/wavereports.py under a fixed name
+  el("reportLinks").innerHTML = stations.map(s =>
+    `<li><a href="reports/pdf/${s.id}_wave_exceedance_report.pdf">${s.name} (${s.id}) — PDF report</a></li>`).join("");
+  // facts_text is computed weekly by build_data.py; notes are typed in stations.json
+  el("stationNotes").innerHTML = stations.filter(s => s.summary || (s.notes && s.notes.length)).map(s => {
+    const lines = (s.facts_text || []).concat(s.notes || []);
+    return `<p><b>* ${s.name} (${s.id}):</b> ${s.summary || ""}</p>` +
+      (lines.length ? `<ul>${lines.map(n => `<li>${n}</li>`).join("")}</ul>` : "");
+  }).join("");
   const last = stations.map(s => s.last_obs_utc).filter(Boolean).sort().pop();
   el("updated").textContent = `Data file built ${D.generated_utc}; latest observation ${last}.`;
 

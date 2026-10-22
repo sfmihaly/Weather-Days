@@ -35,6 +35,9 @@ tr.nodata td { color: #9aa3ad; }
 .partial { color: #9a4b00; font-weight: 600; font-size: .8rem; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
 .plot { width: 100%; min-height: 340px; }
+ul.reports { margin: 6px 0 0; padding-left: 20px; }
+ul.reports li { margin: 3px 0; }
+ul.reports a { color: var(--accent); }
 details { margin: 28px 0 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px; }
 summary { cursor: pointer; font-weight: 600; }
 footer { color: var(--muted); font-size: .8rem; padding-top: 18px; padding-bottom: 28px; }

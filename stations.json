@@ -1,15 +1,43 @@
 {
   "record_start": "2024-01-01",
-  "season": {"first_month": 3, "last_month": 11},
+  "season": {
+    "first_month": 3,
+    "last_month": 11
+  },
   "map": {
     "fit_padding_deg": 0.8,
     "reference_sites_label": "ONC NEPTUNE node",
     "reference_sites": [
-      {"name": "Folger Passage", "onc_code": "FGPD", "lat": 48.8138, "lon": -125.2806},
-      {"name": "Barkley Canyon", "onc_code": "BACND", "lat": 48.3457, "lon": -126.1579},
-      {"name": "Clayoquot Slope (ODP 889)", "onc_code": "NC89", "lat": 48.6706, "lon": -126.8480},
-      {"name": "Cascadia Basin (ODP 1027)", "onc_code": "CBC27", "lat": 47.7564, "lon": -127.7317},
-      {"name": "Endeavour", "onc_code": "KEMF", "lat": 47.9488, "lon": -129.0984}
+      {
+        "name": "Folger Passage",
+        "onc_code": "FGPD",
+        "lat": 48.8138,
+        "lon": -125.2806
+      },
+      {
+        "name": "Barkley Canyon",
+        "onc_code": "BACND",
+        "lat": 48.3457,
+        "lon": -126.1579
+      },
+      {
+        "name": "Clayoquot Slope (ODP 889)",
+        "onc_code": "NC89",
+        "lat": 48.6706,
+        "lon": -126.848
+      },
+      {
+        "name": "Cascadia Basin (ODP 1027)",
+        "onc_code": "CBC27",
+        "lat": 47.7564,
+        "lon": -127.7317
+      },
+      {
+        "name": "Endeavour",
+        "onc_code": "KEMF",
+        "lat": 47.9488,
+        "lon": -129.0984
+      }
     ]
   },
   "stations": [
@@ -19,7 +47,16 @@
       "source": "cioos_dfo_meds",
       "source_station_id": "C46206",
       "lat": 48.83,
-      "lon": -126.00
+      "lon": -126.0,
+      "report": {
+        "data_notes": [
+          "Where both existed (to 2022), VWH matched the QC'd spectral Hs (VCAR) to within about 0.1 m RMS."
+        ],
+        "key_results_extra": [],
+        "caveats_extra": [
+          "C46206 sits on the outer shelf. Conditions at the work site, especially further offshore, may differ."
+        ]
+      }
     },
     {
       "id": "C46132",
@@ -27,7 +64,18 @@
       "source": "cioos_dfo_meds",
       "source_station_id": "C46132",
       "lat": 49.78,
-      "lon": -127.88
+      "lon": -127.88,
+      "report": {
+        "data_notes": [
+          "The sharp rise on 29 Oct 2025 (7.0 to 10.2 m in one hour) was followed 2–3 h later by a 9.1 m peak at La Perouse Bank, consistent with a real storm."
+        ],
+        "key_results_extra": [
+          "May is noticeably rougher here than at La Perouse Bank."
+        ],
+        "caveats_extra": [
+          "C46132 sits off the Brooks Peninsula, further north and more exposed than La Perouse Bank. Conditions at the work site may differ from either buoy."
+        ]
+      }
     },
     {
       "id": "C46036",
@@ -39,11 +87,19 @@
       "default_selected": false,
       "summary": "Open-ocean buoy about 590 km west of La Perouse Bank; not included by default.",
       "notes": [
-        "No complete March–November season yet.",
-        "No wave data from mid-August 2024 to mid-June 2025 (a 10-month gap).",
-        "Wave heights run about 22% higher than at La Perouse Bank and 8% higher than at South Brooks.",
-        "Sea states lead South Brooks by about 9 h and La Perouse Bank by about 15 h, so it gives early warning of incoming weather."
-      ]
+        "Sea-state changes usually reach it first, so it gives early warning of weather arriving at the coast."
+      ],
+      "report": {
+        "data_notes": [
+          "The MEDS QC'd value (VCAR) in this record is a 10,000 m placeholder throughout (January–August 2024) and is removed, so the buoy-reported value (VWH) is used for the whole period."
+        ],
+        "key_results_extra": [
+          "Changes in sea state usually reach South Nomad before the coastal buoys, consistent with swell and storms arriving from offshore."
+        ],
+        "caveats_extra": [
+          "C46036 is far offshore in the open Pacific. It represents incoming deep-water sea state, not conditions on the shelf or at the NEPTUNE sites, which are generally lower."
+        ]
+      }
     }
   ]
 }

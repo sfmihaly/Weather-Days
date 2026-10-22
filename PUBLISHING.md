@@ -48,11 +48,13 @@ Refresh the repository page on GitHub. The files and the commit history should b
 
 Repository → **Settings** → **Pages** → Build and deployment:
 
-- **Source:** Deploy from a branch.
-- **Branch:** `main`, folder `/ (root)` → **Save**.
+- **Source:** **GitHub Actions**.
 
-After a minute or two the page shows the address, e.g.
-`https://OWNER.github.io/wave-weather-days/`.
+The workflow **Build and publish** (step 6) builds the site and hands it to Pages. The address is
+shown on the same settings page, e.g. `https://OWNER.github.io/Weather-Days/`.
+
+(Before October 2026 this repository used "Deploy from a branch". That no longer works, because
+the data and reports are not stored in the branch any more.)
 
 **Visibility note.**
 - On a free personal account, GitHub Pages works only for **public** repositories.
@@ -61,25 +63,33 @@ After a minute or two the page shows the address, e.g.
 - Either way, the published site itself can be opened by anyone who has the address. The
   `noindex` line in `index.html` asks search engines not to list it, but it is not access control.
 
-## 6. Turn on the weekly data update
+## 6. The weekly build ("Build and publish")
 
-The workflow `.github/workflows/update-data.yml` refreshes the buoy data every Monday and commits it.
+The workflow `.github/workflows/update-data.yml` runs every Monday, after every push to `main`, and
+whenever you start it by hand. It:
+1. downloads fresh buoy data;
+2. builds the dashboard data and the PDF reports;
+3. publishes the result to GitHub Pages.
 
-1. Repository → **Settings** → **Actions** → **General** → Workflow permissions → **Read and write
-   permissions** → Save. In an organisation this may be set, or locked, by an administrator.
-2. Test it: **Actions** tab → **Update buoy data** → **Run workflow**. A green tick and a new
-   "Update buoy data" commit mean it works. The published page updates a minute or two later.
-3. GitHub may pause scheduled workflows in a repository that has had no activity for 60 days. If
-   that happens, re-enable it from the Actions tab.
+It does **not** commit anything back to the repository, so it needs no write permission.
+
+- **Run it by hand:** **Actions** tab (top row of the repository page, not Settings) → **Build and
+  publish** in the left list → **Run workflow** → **Run workflow**.
+- **Success:** both jobs (*build*, *deploy*) get green ticks. The site updates when *deploy*
+  finishes, about 2–3 minutes in total.
+- **Failure:** nothing is published, and the previous site stays online. GitHub emails you. Open
+  the failed run to see which step failed. A data-server outage usually clears up by the next run.
+- **Inactivity:** GitHub may pause scheduled workflows in a repository that has had no activity for
+  60 days. If that happens, re-enable it from the Actions tab.
 
 ## 7. Updating the site (the routine)
 
-The weekly job adds its own "Update buoy data" commits on GitHub, so your folder falls behind.
-Always start with `git pull`.
+Start with `git pull`. It brings in any commits made on GitHub, for example edits made in the
+browser. The weekly build no longer commits, but pulling first is a good habit.
 
 ```
 cd /Users/smihaly/Analysis/Claude/wave_dashboard
-git pull                                    # bring in commits from GitHub (e.g. the weekly data)
+git pull                                    # bring in any commits from GitHub
 # ... make the changes ...
 git status                                  # which files changed
 git diff                                    # optional: the changed lines (q to quit)
@@ -88,7 +98,8 @@ git commit -m "Short description"           # save a snapshot locally
 git push                                    # upload to GitHub
 ```
 
-GitHub Pages republishes about a minute after each push.
+Each push starts **Build and publish**; the site updates 2–3 minutes later. To check your change
+locally first, run `python scripts/build_site.py` and open `index.html`.
 
 ### Useful extras
 
@@ -99,12 +110,13 @@ GitHub Pages republishes about a minute after each push.
 | Throw away an uncommitted edit | `git restore <file>` | Puts the file back as it was at the last commit. This can't be undone. |
 | Unstage a file added by mistake | `git restore --staged <file>` | Takes it out of the next commit; the edit itself stays |
 | Behind or ahead of GitHub? | `git status` (first line) | E.g. "Your branch is behind 'origin/main' by 1 commit" |
-| Refresh the data now | `python scripts/build_data.py` | Rebuilds the data files; then add, commit and push |
+| Refresh the live site now | Actions → Build and publish → Run workflow | Fresh data and reports, no commit needed |
+| Build locally to preview | `python scripts/build_site.py` | Data, reports and `_site/`; then open `index.html` |
 
 ### If `git push` is refused
 
 A message like *"Updates were rejected because the remote contains work that you do not have
-locally"* means a weekly data commit arrived after your last pull. Run:
+locally"* means GitHub has a commit you haven't pulled. Run:
 
 ```
 git pull
