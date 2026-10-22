@@ -44,6 +44,10 @@ scripts/build_data.py       downloads, cleans and writes the data files
 .github/workflows/update-data.yml   weekly job that refreshes the data
 ```
 
+## Publishing
+
+See [PUBLISHING.md](PUBLISHING.md) for putting the dashboard on GitHub and turning on GitHub Pages.
+
 ## Viewing locally
 
 Open `index.html` in a browser. All data is loaded from local files, so no server is needed.
@@ -90,8 +94,9 @@ ONC NEPTUNE nodes (squares) on GEBCO shaded bathymetry.
 - The bathymetry is one image, `assets/bathymetry.jpg`, downloaded from the GEBCO Web Map Service
   by `scripts/build_data.py` for that extent. It is stored in the repository, so the map works
   offline and does not depend on GEBCO's server when someone opens the page.
-- After adding a buoy or node, run `python scripts/build_data.py` so the image is redrawn for the
-  new extent.
+- `assets/bathymetry.json` records the extent the image covers. The image is downloaded again only
+  when that extent changes, e.g. after adding a buoy or node. If GEBCO cannot be reached, the
+  previous image and its extent are kept, so the background still lines up with the markers.
 - The map is drawn as an ordinary longitude–latitude chart, with latitude scaled to the
   mid-latitude so distances look right. Scroll to zoom and drag to pan. Double-click to reset.
 

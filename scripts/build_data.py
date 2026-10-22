@@ -75,6 +75,7 @@ def to_hourly_grid(s):
 
 GEBCO_WMS = "https://wms.gebco.net/mapserv"
 MAP_IMAGE = "assets/bathymetry.jpg"
+MAP_IMAGE_META = "assets/bathymetry.json"        # records the extent the image was made for
 MAP_WIDTH_PX = 2000
 
 
@@ -99,15 +100,30 @@ def build_map_image(cfg):
     params = {"request": "GetMap", "service": "WMS", "version": "1.3.0", "layers": "GEBCO_LATEST",
               "styles": "", "crs": "EPSG:4326", "bbox": f"{S},{W},{N},{E}",
               "width": MAP_WIDTH_PX, "height": height, "format": "image/jpeg"}
-    try:
-        r = requests.get(GEBCO_WMS, params=params, timeout=180)
-        r.raise_for_status()
-        if not r.headers.get("content-type", "").startswith("image/"):
-            raise ValueError(r.text[:200])
-        (ROOT / MAP_IMAGE).write_bytes(r.content)
-        print(f"map: extent W{W} E{E} S{S} N{N}; wrote {MAP_IMAGE} ({len(r.content) / 1e3:.0f} kB)")
-    except Exception as e:                              # keep the old image rather than fail the build
-        print(f"map: GEBCO image not updated ({e})")
+    img, meta = ROOT / MAP_IMAGE, ROOT / MAP_IMAGE_META
+    old = json.loads(meta.read_text()) if meta.exists() else {}
+    wanted = {"extent": [W, E, S, N], "width": MAP_WIDTH_PX}
+    if img.exists() and old.get("extent") == wanted["extent"] and old.get("width") == MAP_WIDTH_PX:
+        print(f"map: {MAP_IMAGE} already covers W{W} E{E} S{S} N{N}; not re-downloaded")
+    else:
+        try:
+            r = requests.get(GEBCO_WMS, params=params, timeout=180)
+            r.raise_for_status()
+            if not r.headers.get("content-type", "").startswith("image/"):
+                raise ValueError(r.text[:200])
+            img.write_bytes(r.content)
+            meta.write_text(json.dumps(wanted) + "\n")
+            print(f"map: extent W{W} E{E} S{S} N{N}; wrote {MAP_IMAGE} ({len(r.content) / 1e3:.0f} kB)")
+        except Exception as e:
+            # Keep the previous image, and its own extent, so the background still lines up with
+            # the markers; points outside it are drawn on the plain background colour.
+            print(f"map: GEBCO image not updated ({e})")
+            if img.exists() and old.get("extent"):
+                W, E, S, N = old["extent"]
+                print("map: using the previous image and its extent")
+            else:
+                m.update({"extent": [W, E, S, N]})
+                return m                                 # no image available
     m.update({"image": MAP_IMAGE, "extent": [W, E, S, N]})
     return m
 
