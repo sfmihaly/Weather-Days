@@ -269,58 +269,48 @@
     update();
   }
 
-  // ---- map: buoys and reference sites on GEBCO bathymetry ----------------------
-  const GEBCO_TILES = "https://wms.gebco.net/mapserv?service=WMS&request=GetMap&version=1.3.0&layers=GEBCO_LATEST" +
-    "&styles=&format=image/png&crs=EPSG:3857&width=256&height=256&bbox={bbox-epsg-3857}";
+  // ---- map: buoys and reference sites on a GEBCO bathymetry image ---------------
+  // Drawn as an ordinary longitude–latitude chart with the image (made by build_data.py) behind it,
+  // so square markers, labels, hover and click need no map-engine fonts or icon sprites.
   const MAP = D.map || {};
-  /** Centre and zoom that fit every buoy and reference site in the map div (MapLibre: 512-px world at zoom 0). */
-  function mapView(div) {
-    if (MAP.center && MAP.zoom) return { center: MAP.center, zoom: MAP.zoom };
-    const pts = stations.map(s => [s.lat, s.lon]).concat((MAP.reference_sites || []).map(r => [r.lat, r.lon]));
-    const pad = MAP.fit_padding_deg ?? 0.8;
-    const lats = pts.map(p => p[0]), lons = pts.map(p => p[1]);
-    const W = Math.min(...lons) - pad, E = Math.max(...lons) + pad;
-    const S = Math.min(...lats) - pad, N = Math.max(...lats) + pad;
-    const merc = lat => Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
-    const w = div.clientWidth || 640, h = div.clientHeight || 460;
-    const zx = Math.log2(w * 360 / (512 * (E - W)));
-    const zy = Math.log2(h * 2 * Math.PI / (512 * (merc(N) - merc(S))));
-    const lat = Math.atan(Math.sinh((merc(N) + merc(S)) / 2)) * 180 / Math.PI;
-    return { center: { lat, lon: (W + E) / 2 }, zoom: Math.max(1, Math.min(zx, zy, 10)) };
-  }
-  let mapViewCache = null;
   function renderMap(inp) {
     const div = el("mapPlot");
     if (!div) return;
-    if (!mapViewCache) mapViewCache = mapView(div);
     const sel = new Set(inp.sel.map(s => s.id));
     const refs = MAP.reference_sites || [];
+    const pts = stations.map(s => [s.lat, s.lon]).concat(refs.map(r => [r.lat, r.lon]));
+    const pad = MAP.fit_padding_deg ?? 0.8;
+    const [W, E, S, N] = MAP.extent || [
+      Math.min(...pts.map(p => p[1])) - pad, Math.max(...pts.map(p => p[1])) + pad,
+      Math.min(...pts.map(p => p[0])) - pad, Math.max(...pts.map(p => p[0])) + pad];
     const traces = [];
     if (refs.length) traces.push({
-      type: "scattermap", mode: "markers", name: MAP.reference_sites_label || "Reference site",
-      lat: refs.map(r => r.lat), lon: refs.map(r => r.lon), text: refs.map(r => r.name),
-      marker: { symbol: "square", size: 14, color: "#ffcc00" },
-      hovertemplate: "%{text}<br>%{lat:.3f} N, %{customdata:.3f} W<extra></extra>",
+      type: "scatter", mode: "markers", name: MAP.reference_sites_label || "Reference site",
+      x: refs.map(r => r.lon), y: refs.map(r => r.lat), text: refs.map(r => r.name),
       customdata: refs.map(r => -r.lon),
+      marker: { symbol: "square", size: 13, color: "#ffcc00", line: { color: "#1d2733", width: 1.2 } },
+      hovertemplate: "%{text}<br>%{y:.3f} N, %{customdata:.3f} W<extra></extra>",
     });
-    const order = stations.map((s, k) => k);
     traces.push({
-      type: "scattermap", mode: "markers+text", name: "Wave buoy",
-      lat: order.map(k => stations[k].lat), lon: order.map(k => stations[k].lon),
-      text: order.map(k => stations[k].id), textposition: "top right",
+      type: "scatter", mode: "markers+text", name: "Wave buoy (click to include / exclude)",
+      x: stations.map(s => s.lon), y: stations.map(s => s.lat),
+      text: stations.map(s => s.id), textposition: "top right",
       textfont: { size: 12, color: "#1d2733" },
-      customdata: order.map(k => [k, stations[k].name, -stations[k].lon, stations[k].summary ? "<br>" + stations[k].summary : ""]),
-      marker: { size: 16, color: order.map(k => sel.has(stations[k].id) ? "#d1495b" : "#9aa3ad") },
-      hovertemplate: "%{customdata[1]} (%{text})<br>%{lat:.2f} N, %{customdata[2]:.2f} W%{customdata[3]}<br>click to include / exclude<extra></extra>",
+      customdata: stations.map((s, k) => [k, s.name, -s.lon, s.summary ? "<br>" + s.summary : ""]),
+      marker: { symbol: "circle", size: 16, color: stations.map(s => sel.has(s.id) ? "#d1495b" : "#9aa3ad"),
+                line: { color: "white", width: 2 } },
+      hovertemplate: "%{customdata[1]} (%{text})<br>%{y:.2f} N, %{customdata[2]:.2f} W%{customdata[3]}<br>click to include / exclude<extra></extra>",
     });
+    const latC = (S + N) / 2;
     const layout = {
-      height: div.clientHeight || 460, margin: { l: 0, r: 0, t: 0, b: 0 }, showlegend: true, uirevision: "map",
-      legend: { x: 0.01, y: 0.01, xanchor: "left", yanchor: "bottom", bgcolor: "rgba(255,255,255,0.8)", font: { size: 11 } },
-      map: {
-        style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "#dfe7ee" } }] },
-        center: mapViewCache.center, zoom: mapViewCache.zoom, uirevision: "map",
-        layers: [{ sourcetype: "raster", source: [GEBCO_TILES], below: "traces" }],
-      },
+      height: div.clientHeight || 460, margin: { l: 44, r: 8, t: 8, b: 30 }, uirevision: "map",
+      plot_bgcolor: "#dfe7ee", paper_bgcolor: "rgba(0,0,0,0)", dragmode: "pan", hovermode: "closest",
+      xaxis: { range: [W, E], showgrid: false, zeroline: false, ticksuffix: "°", tickfont: { size: 10 }, constrain: "domain" },
+      yaxis: { range: [S, N], showgrid: false, zeroline: false, ticksuffix: "°", tickfont: { size: 10 },
+               scaleanchor: "x", scaleratio: 1 / Math.cos(latC * Math.PI / 180), constrain: "domain" },
+      images: MAP.image ? [{ source: MAP.image, xref: "x", yref: "y", x: W, y: N, sizex: E - W, sizey: N - S,
+                             sizing: "stretch", layer: "below", opacity: 1 }] : [],
+      legend: { x: 0.01, y: 0.01, xanchor: "left", yanchor: "bottom", bgcolor: "rgba(255,255,255,0.85)", font: { size: 11 } },
     };
     Plotly.react(div, traces, layout, { displaylogo: false, responsive: true, scrollZoom: true });
     if (!div._clickHandler) {

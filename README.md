@@ -85,11 +85,15 @@ ONC NEPTUNE nodes (squares) on GEBCO shaded bathymetry.
 
 - The node list is in `stations.json` under `map.reference_sites`. Positions come from the ONC
   Oceans 3.0 API (`/api/locations`).
-- The initial view fits all buoys and nodes automatically, with a margin of `map.fit_padding_deg`
-  degrees. To fix the view instead, set `map.center` and `map.zoom`.
-- After editing these, run `python scripts/build_data.py`.
-- The bathymetry tiles load from the GEBCO Web Map Service, so they need an internet connection.
-  Offline, the markers still show on a plain background.
+- The map extent fits all buoys and nodes automatically, with a margin of `map.fit_padding_deg`
+  degrees. To fix the extent instead, set `map.extent` to `[west, east, south, north]`.
+- The bathymetry is one image, `assets/bathymetry.jpg`, downloaded from the GEBCO Web Map Service
+  by `scripts/build_data.py` for that extent. It is stored in the repository, so the map works
+  offline and does not depend on GEBCO's server when someone opens the page.
+- After adding a buoy or node, run `python scripts/build_data.py` so the image is redrawn for the
+  new extent.
+- The map is drawn as an ordinary longitude–latitude chart, with latitude scaled to the
+  mid-latitude so distances look right. Scroll to zoom and drag to pan. Double-click to reset.
 
 ## Method
 

@@ -73,13 +73,52 @@ def to_hourly_grid(s):
     return grid[0].strftime("%Y-%m-%dT%H:%MZ"), dm
 
 
+GEBCO_WMS = "https://wms.gebco.net/mapserv"
+MAP_IMAGE = "assets/bathymetry.jpg"
+MAP_WIDTH_PX = 2000
+
+
+def build_map_image(cfg):
+    """Fit the map extent to all buoys and reference sites, and save a GEBCO image of it.
+
+    Returns the map settings for the dashboard, with "image" and "extent" [W, E, S, N] added.
+    The image is skipped (and the previous one kept) if GEBCO cannot be reached.
+    """
+    m = dict(cfg.get("map", {}))
+    pts = [(s["lat"], s["lon"]) for s in cfg["stations"]] + \
+          [(r["lat"], r["lon"]) for r in m.get("reference_sites", [])]
+    pad = m.get("fit_padding_deg", 0.8)
+    if "extent" in m:                                   # fixed extent from stations.json
+        W, E, S, N = m["extent"]
+    else:
+        W = min(p[1] for p in pts) - pad; E = max(p[1] for p in pts) + pad
+        S = min(p[0] for p in pts) - pad; N = max(p[0] for p in pts) + pad
+    W, E, S, N = (round(v, 3) for v in (W, E, S, N))
+    lat_c = np.deg2rad((S + N) / 2)
+    height = int(round(MAP_WIDTH_PX * (N - S) / ((E - W) * np.cos(lat_c))))
+    params = {"request": "GetMap", "service": "WMS", "version": "1.3.0", "layers": "GEBCO_LATEST",
+              "styles": "", "crs": "EPSG:4326", "bbox": f"{S},{W},{N},{E}",
+              "width": MAP_WIDTH_PX, "height": height, "format": "image/jpeg"}
+    try:
+        r = requests.get(GEBCO_WMS, params=params, timeout=180)
+        r.raise_for_status()
+        if not r.headers.get("content-type", "").startswith("image/"):
+            raise ValueError(r.text[:200])
+        (ROOT / MAP_IMAGE).write_bytes(r.content)
+        print(f"map: extent W{W} E{E} S{S} N{N}; wrote {MAP_IMAGE} ({len(r.content) / 1e3:.0f} kB)")
+    except Exception as e:                              # keep the old image rather than fail the build
+        print(f"map: GEBCO image not updated ({e})")
+    m.update({"image": MAP_IMAGE, "extent": [W, E, S, N]})
+    return m
+
+
 def main():
     cfg = json.loads((ROOT / "stations.json").read_text())
     out = {
         "generated_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "record_start": cfg["record_start"],
         "season": cfg["season"],
-        "map": cfg.get("map", {}),
+        "map": build_map_image(cfg),
         "units": "Hs in decimetres on an hourly UTC grid starting at t0; null = no data",
         "stations": [],
     }
