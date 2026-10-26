@@ -5,6 +5,8 @@ reports always use the same rules and agree on the numbers.
 """
 import io
 import math
+import os
+import time
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +14,12 @@ import pandas as pd
 import requests
 
 ERDDAP = "https://data.cioospacific.ca/erddap/tabledap/DFO_MEDS_BUOYS.csv"
+DOWNLOAD_TRIES = int(os.environ.get("WAVE_DOWNLOAD_TRIES", 3))      # per station
+DOWNLOAD_WAIT_S = int(os.environ.get("WAVE_DOWNLOAD_WAIT_S", 120))  # between attempts
+
+
+class DownloadError(RuntimeError):
+    """The data server could not be reached or the dataset is offline (not the same as 'no rows')."""
 
 # ---- quality control --------------------------------------------------------------
 HS_MIN, HS_MAX = 0.2, 20.0     # m; outside this range = placeholder / stuck sensor
@@ -32,10 +40,28 @@ def download_raw(station_id, start, dest=None):
     """
     q = (f"?STN_ID,time,Q_FLAG,latitude,longitude,VCAR,VWH"
          f"&STN_ID=%22{station_id}%22&time>={start}T00:00:00Z")
-    r = requests.get(ERDDAP + q, timeout=600)
-    if r.status_code == 404:                  # ERDDAP answers 404 when no rows match
-        return pd.DataFrame(columns=["STN_ID", "time", "Q_FLAG", "latitude", "longitude", "VCAR", "VWH"])
-    r.raise_for_status()
+    last_err = None
+    for attempt in range(1, DOWNLOAD_TRIES + 1):
+        try:
+            r = requests.get(ERDDAP + q, timeout=600)
+        except requests.RequestException as e:
+            r, last_err = None, f"{type(e).__name__}: {e}"
+        if r is not None:
+            # ERDDAP answers 404 both for "no rows match" (a legitimate empty result) and for
+            # "unknown datasetID" (the dataset is offline). Only the first may be treated as empty.
+            if r.status_code == 404 and "no matching results" in r.text:
+                return pd.DataFrame(columns=["STN_ID", "time", "Q_FLAG", "latitude", "longitude", "VCAR", "VWH"])
+            if r.ok:
+                break
+            last_err = f"HTTP {r.status_code}: {' '.join(r.text.split())[:200]}"
+        if attempt < DOWNLOAD_TRIES:
+            print(f"{station_id}: download attempt {attempt} failed ({last_err}); "
+                  f"retrying in {DOWNLOAD_WAIT_S} s", flush=True)
+            time.sleep(DOWNLOAD_WAIT_S)
+    else:
+        raise DownloadError(
+            f"{station_id}: CIOOS ERDDAP download failed after {DOWNLOAD_TRIES} attempts ({last_err}). "
+            f"Check {ERDDAP.rsplit('/tabledap', 1)[0]}/status.html - nothing has been published.")
     if dest is not None:
         Path(dest).parent.mkdir(parents=True, exist_ok=True)
         Path(dest).write_bytes(r.content)

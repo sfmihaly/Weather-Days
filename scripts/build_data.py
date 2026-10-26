@@ -159,6 +159,10 @@ def main(argv=None):
         _, d = load_station(st, start, raw_dir, a.from_raw)
         hourly[st["id"]] = W.hourly(d)
         last[st["id"]] = d["time"].max() if not d.empty else None
+    if all(v is None for v in last.values()):
+        # Never publish an empty dashboard: this almost certainly means the server returned
+        # nothing useful rather than that every buoy stopped reporting.
+        raise W.DownloadError("no data for any station - refusing to write wave_data.js")
     names = {s["id"]: s["name"] for s in cfg["stations"]}
     for st in cfg["stations"]:
         sid, h = st["id"], hourly[st["id"]]
@@ -189,4 +193,7 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except W.DownloadError as e:
+        sys.exit(f"BUILD STOPPED: {e}")

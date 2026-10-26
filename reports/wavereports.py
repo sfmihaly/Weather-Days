@@ -533,4 +533,7 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except W.DownloadError as e:
+        sys.exit(f"BUILD STOPPED: {e}")

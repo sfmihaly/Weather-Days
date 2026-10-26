@@ -25,7 +25,9 @@ SITE = ROOT / "_site"
 
 def run(*args):
     print("+", " ".join(str(a) for a in args), flush=True)
-    subprocess.run([sys.executable, *map(str, args)], cwd=ROOT, check=True)
+    rc = subprocess.run([sys.executable, *map(str, args)], cwd=ROOT).returncode
+    if rc:
+        sys.exit(f"{args[0]} failed (exit code {rc}); see the message above. The site was not rebuilt.")
 
 
 def main(argv=None):
