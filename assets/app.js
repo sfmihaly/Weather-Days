@@ -297,8 +297,10 @@
         hoverinfo: "skip", line: { color: ln.color || "#ffcc00", width: 1.8 } });
     }
     if (refs.length) traces.push({
-      type: "scatter", mode: "markers", name: MAP.reference_sites_label || "Reference site",
+      type: "scatter", mode: "markers+text", name: MAP.reference_sites_label || "Reference site",
       x: refs.map(r => r.lon), y: refs.map(r => r.lat), text: refs.map(r => r.name),
+      textposition: refs.map(r => r.label_position || "bottom right"),        // set per node in stations.json
+      textfont: { size: 11, color: "#1d2733", shadow: "0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff" },
       customdata: refs.map(r => -r.lon),
       marker: { symbol: "square", size: 13, color: "#ffcc00", line: { color: "#1d2733", width: 1.2 } },
       hovertemplate: "%{text}<br>%{y:.3f} N, %{customdata:.3f} W<extra></extra>",
@@ -307,7 +309,7 @@
       type: "scatter", mode: "markers+text", name: "Wave buoy (click to include / exclude)",
       x: stations.map(s => s.lon), y: stations.map(s => s.lat),
       text: stations.map(s => s.id), textposition: "top right",
-      textfont: { size: 12, color: "#1d2733" },
+      textfont: { size: 12, color: "#1d2733", shadow: "0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff" },
       customdata: stations.map((s, k) => [k, s.name, -s.lon, s.summary ? "<br>" + s.summary : ""]),
       marker: { symbol: "circle", size: 16, color: stations.map(s => sel.has(s.id) ? "#d1495b" : "#9aa3ad"),
                 line: { color: "white", width: 2 } },

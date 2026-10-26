@@ -137,7 +137,9 @@ The map beside the inputs shows the buoys (circles; click one to include or excl
 ONC NEPTUNE nodes (squares) and the NEPTUNE backbone cable on GEBCO shaded bathymetry.
 
 - The node list is in `stations.json` under `map.reference_sites`. Positions come from the ONC
-  Oceans 3.0 API (`/api/locations`).
+  Oceans 3.0 API (`/api/locations`). Each node is labelled with its name; `label_position`
+  (e.g. `"bottom right"`, `"top left"`, `"bottom center"`) sets which side the label goes, so it
+  can be moved off the cable or another label.
 - The cable is `assets/neptune_cable.geojson`, listed in `stations.json` under `map.lines`. It was
   made from ONC's `ONC_BackboneCables_20150120.kml` with
   `python scripts/make_cable_geojson.py <file.kml>`, which keeps the named NEPTUNE pieces (main

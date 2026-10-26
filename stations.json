@@ -14,31 +14,31 @@
     "reference_sites": [
       {
         "name": "Folger Passage",
-        "onc_code": "FGPD",
+        "onc_code": "FGPD", "label_position": "bottom right",
         "lat": 48.8138,
         "lon": -125.2806
       },
       {
         "name": "Barkley Canyon",
-        "onc_code": "BACND",
+        "onc_code": "BACND", "label_position": "bottom right",
         "lat": 48.3457,
         "lon": -126.1579
       },
       {
         "name": "Clayoquot Slope (ODP 889)",
-        "onc_code": "NC89",
+        "onc_code": "NC89", "label_position": "top left",
         "lat": 48.6706,
         "lon": -126.848
       },
       {
         "name": "Cascadia Basin (ODP 1027)",
-        "onc_code": "CBC27",
+        "onc_code": "CBC27", "label_position": "bottom center",
         "lat": 47.7564,
         "lon": -127.7317
       },
       {
         "name": "Endeavour",
-        "onc_code": "KEMF",
+        "onc_code": "KEMF", "label_position": "bottom left",
         "lat": 47.9488,
         "lon": -129.0984
       }
