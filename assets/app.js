@@ -290,6 +290,12 @@
       Math.min(...pts.map(p => p[1])) - pad, Math.max(...pts.map(p => p[1])) + pad,
       Math.min(...pts.map(p => p[0])) - pad, Math.max(...pts.map(p => p[0])) + pad];
     const traces = [];
+    for (const ln of MAP.lines || []) {                          // e.g. the NEPTUNE cable, under the markers
+      if (ln.casing) traces.push({ type: "scatter", mode: "lines", x: ln.x, y: ln.y, showlegend: false,
+        hoverinfo: "skip", line: { color: ln.casing, width: 3.5 } });
+      traces.push({ type: "scatter", mode: "lines", name: ln.label, x: ln.x, y: ln.y,
+        hoverinfo: "skip", line: { color: ln.color || "#ffcc00", width: 1.8 } });
+    }
     if (refs.length) traces.push({
       type: "scatter", mode: "markers", name: MAP.reference_sites_label || "Reference site",
       x: refs.map(r => r.lon), y: refs.map(r => r.lat), text: refs.map(r => r.name),

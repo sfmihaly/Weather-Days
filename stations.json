@@ -7,6 +7,10 @@
   "map": {
     "fit_padding_deg": 0.8,
     "reference_sites_label": "ONC NEPTUNE node",
+    "lines": [
+      {"file": "assets/neptune_cable.geojson", "label": "NEPTUNE backbone cable (ONC, 2015)",
+       "color": "#ffcc00", "casing": "#1d2733"}
+    ],
     "reference_sites": [
       {
         "name": "Folger Passage",

@@ -38,10 +38,12 @@ assets/calc.js              exceedance calculations (also runs under Node for te
 assets/style.css
 assets/plotly.min.js        Plotly.js 4.1.2, bundled so the page needs no external CDN (MIT, see PLOTLY_LICENSE.txt)
 assets/bathymetry.jpg/.json GEBCO background image for the map, and the extent it covers
+assets/neptune_cable.geojson NEPTUNE backbone cable drawn on the map (from ONC's 2015 KML)
 stations.json               the buoys, map settings and hand-written report notes (one list for everything)
 scripts/wavecommon.py       download, cleaning and data facts, shared by the dashboard and the reports
 scripts/build_data.py       builds data/wave_data.js for the dashboard
 scripts/build_site.py       builds everything: data, reports and the _site/ folder that is published
+scripts/make_cable_geojson.py  converts ONC's cable KML to assets/neptune_cable.geojson (run by hand)
 reports/wavereports.py      builds the PDF report for each buoy
 requirements.txt            Python packages (versions pinned)
 .github/workflows/update-data.yml   "Build and publish": weekly, and after every push
@@ -132,10 +134,16 @@ automatically.
 ## Map
 
 The map beside the inputs shows the buoys (circles; click one to include or exclude it) and the
-ONC NEPTUNE nodes (squares) on GEBCO shaded bathymetry.
+ONC NEPTUNE nodes (squares) and the NEPTUNE backbone cable on GEBCO shaded bathymetry.
 
 - The node list is in `stations.json` under `map.reference_sites`. Positions come from the ONC
   Oceans 3.0 API (`/api/locations`).
+- The cable is `assets/neptune_cable.geojson`, listed in `stations.json` under `map.lines`. It was
+  made from ONC's `ONC_BackboneCables_20150120.kml` with
+  `python scripts/make_cable_geojson.py <file.kml>`, which keeps the named NEPTUNE pieces (main
+  ring from Port Alberni and the node spurs; the VENUS segments are outside the map) and
+  simplifies them to about 150 m. Re-run it only if ONC issues a new cable file. The Endeavour
+  spur in the 2015 file ends about 5 km east of the current node position.
 - The map extent fits all buoys and nodes automatically, with a margin of `map.fit_padding_deg`
   degrees. To fix the extent instead, set `map.extent` to `[west, east, south, north]`.
 - The bathymetry is one image, `assets/bathymetry.jpg`, downloaded from the GEBCO Web Map Service

@@ -85,6 +85,20 @@ MAP_IMAGE_META = "assets/bathymetry.json"        # records the extent the image 
 MAP_WIDTH_PX = 2000
 
 
+def map_lines(m):
+    """Inline each map line (a GeoJSON file of LineStrings) as x/y arrays, pieces separated by null."""
+    out = []
+    for ln in m.get("lines", []):
+        gj = json.loads((ROOT / ln["file"]).read_text())
+        x, y = [], []
+        for f in gj["features"]:
+            for lon, lat in f["geometry"]["coordinates"]:
+                x.append(lon); y.append(lat)
+            x.append(None); y.append(None)
+        out.append({**{k: v for k, v in ln.items() if k != "file"}, "x": x[:-1], "y": y[:-1]})
+    return out
+
+
 def build_map_image(cfg):
     """Fit the map extent to all buoys and reference sites, and save a GEBCO image of it.
 
@@ -150,7 +164,7 @@ def main(argv=None):
         "generated_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "record_start": start,
         "season": cfg["season"],
-        "map": build_map_image(cfg),
+        "map": {**build_map_image(cfg), "lines": map_lines(cfg.get("map", {}))},
         "units": "Hs in decimetres on an hourly UTC grid starting at t0; null = no data",
         "stations": [],
     }
