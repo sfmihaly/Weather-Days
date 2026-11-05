@@ -4,16 +4,16 @@ A static web dashboard for estimating how much of a planned research cruise is l
 sea state off the west coast of Vancouver Island.
 
 You enter:
-- the cruise start date (March–November);
+- the cruise start date (any day of the year);
 - the cruise length;
-- a significant wave height (Hs) limit between 2.00 and 3.00 m;
+- a significant wave height (Hs) limit between 2.00 and 5.00 m;
 - the buoys to use.
 
 The dashboard applies that calendar window to every year with buoy data and shows:
 - the hourly Hs in the window for each year, with the limit marked;
 - the hours above the limit, the percentage of measured time, the equivalent days lost and the
   longest calm spell, per buoy and year, plus all years pooled;
-- how the percentage of time above the limit changes between 1 and 4 m;
+- how the percentage of time above the limit changes between 1 and 6 m;
 - a PDF report for each buoy (below).
 
 It is a planning aid based on a short record (from 2024), not a forecast.
@@ -26,7 +26,7 @@ It is a planning aid based on a short record (from 2024), not a forecast.
 | C46132 | South Brooks | 49.78 N, 127.88 W |
 | C46036 | South Nomad (open ocean; not included by default) | 48.35 N, 133.94 W |
 
-Facts such as complete seasons, data gaps and how each buoy compares with the others are
+Facts such as complete years, data gaps and how each buoy compares with the others are
 calculated every week, and shown in the dashboard notes and the reports.
 
 ## Repository layout
@@ -78,11 +78,12 @@ emails the repository owner about the failed run.
 
 ## Reports
 
-`reports/wavereports.py` makes a 7-page PDF for each buoy:
-- the daily time with Hs above 2.00, 2.25, 2.50, 2.75 and 3.00 m, for 1 March – 30 November of every
-  year (season figure and nine monthly figures);
-- a monthly summary table;
-- key results;
+`reports/wavereports.py` makes a 9-page PDF for each buoy:
+- the daily time with Hs above 2.00, 2.25, 2.50, 2.75, 3.00, 3.50 and 4.00 m, for 1 January –
+  31 December of every year (season figure and twelve monthly figures);
+- a monthly summary table (above 2, 3 and 4 m);
+- key results, in three groups: March–November (the main ship-time season), December–February
+  (per winter: December and the following January and February), and data coverage;
 - data and method;
 - caveats.
 
@@ -174,8 +175,13 @@ ONC NEPTUNE nodes (squares) and the NEPTUNE backbone cable on GEBCO shaded bathy
 - Percentages and days lost use measured time only.
   - Equivalent days lost = fraction of measured time above the limit × cruise length.
   - Years with data for less than 80% of the window are marked "partial".
-- Cruise windows are limited to the March–November season. A cruise that runs past 30 November is
-  evaluated only up to 30 November.
+- The season is set in `stations.json` (`season.first_month`, `season.last_month`); it is now the
+  whole year (1–12). A cruise that starts in December may run past 31 December; the days in January
+  are evaluated with the January data of the following year. With a shorter season (e.g. 3–11) a
+  cruise is evaluated only up to the end of the season.
+- Days are matched by calendar date (month and day), so 29 February 2024 does not shift the rest of
+  that year. The daily report figures use a common 365-day axis and leave 29 February out; it is
+  included in the tables and CSV files.
 
 ## Data licence and attribution
 

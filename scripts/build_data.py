@@ -56,8 +56,9 @@ def facts_text(sid, facts, names):
     """Plain-language data facts for the dashboard notes (same wording as the reports)."""
     out = []
     cs = facts["coverage"]["complete_seasons"]
-    out.append("Complete March–November seasons: " + ", ".join(map(str, cs)) + "." if cs
-               else "No complete March–November season yet.")
+    what = "years" if facts.get("season_months") == list(range(1, 13)) else "seasons"
+    out.append(f"Complete {what} (every month with at least {W.COMPLETE_MONTH_DAYS} full days of data): "
+               + ", ".join(map(str, cs)) + "." if cs else f"No complete {what[:-1]} yet.")
     for g in facts["coverage"]["gaps"]:
         span = f"about {g['days'] / 30.4:.0f} months" if g["days"] >= 60 else f"{g['days']} days"
         out.append(f"No wave data from {W.month_year(g['from'])} to {W.month_year(g['to'])} ({span}).")
@@ -188,7 +189,7 @@ def main(argv=None):
             c = W.compare(h, hourly[o["id"]])
             if c:
                 comps[o["id"]] = c
-        facts = {"coverage": W.coverage(h, years, months), "comparisons": comps}
+        facts = {"coverage": W.coverage(h, years, months), "comparisons": comps, "season_months": list(months)}
         t0, dm = to_dm(h)
         print(f"{sid} {st['name']}: {sum(v is not None for v in dm)} hourly values, t0={t0}, "
               f"last={last[sid]:%Y-%m-%d %H:%M UTC}" if last[sid] is not None else f"{sid}: no data")

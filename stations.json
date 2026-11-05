@@ -1,8 +1,8 @@
 {
   "record_start": "2024-01-01",
   "season": {
-    "first_month": 3,
-    "last_month": 11
+    "first_month": 1,
+    "last_month": 12
   },
   "map": {
     "fit_padding_deg": 0.8,

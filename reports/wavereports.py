@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Wave-height exceedance reports for moored buoys (March–November).
+"""Wave-height exceedance reports for moored buoys (the months set in stations.json, normally all year).
 
 For each buoy in stations.json (repository root) this script
 
   1. downloads hourly significant wave height (Hs) from the DFO MEDS archive (CIOOS Pacific ERDDAP
      dataset DFO_MEDS_BUOYS), or reuses the dashboard's downloads in data/raw;
   2. removes flagged and implausible values (rules in scripts/wavecommon.py, shared with the dashboard);
-  3. computes, for every day 1 March – 30 November, the time (decimal hours) with Hs above
+  3. computes, for every day of the season (stations.json; normally 1 January – 31 December), the time (decimal hours) with Hs above
      2.00, 2.25, 2.50, 2.75 and 3.00 m;
   4. computes the data facts: complete seasons, gaps, automated screening, and comparison with the
      other buoys (ratio, correlation, lead/lag);
-  5. writes a season figure, nine monthly figures, daily and monthly CSV tables and a PDF report.
+  5. writes a season figure, one figure per month, daily and monthly CSV tables and a PDF report.
 
 Usage (from the repository root):
 
@@ -61,20 +61,31 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import wavecommon as W  # noqa: E402
 
 # ---- analysis settings ---------------------------------------------------------
-THRESHOLDS = [2.0, 2.25, 2.5, 2.75, 3.0]   # m
-SEASON = range(3, 12)                       # March–November
+THRESHOLDS = [2.0, 2.25, 2.5, 2.75, 3.0, 3.5, 4.0]   # m
+SEASON = range(1, 13)                       # months analysed; set from stations.json "season" in main()
+SUMMER_SEASON = range(3, 12)                # March–November: the ship-time season summarised in the key results
+WINTER = (12, 1, 2)                         # December–February, summarised per winter (Dec + following Jan, Feb)
 HS_MIN, HS_MAX, BAD_FLAGS = W.HS_MIN, W.HS_MAX, W.BAD_FLAGS
 MAX_GAP_MIN = 120                           # interpolate across gaps up to 2 h
 FULL_DAY_H = W.FULL_DAY_H                   # hours of data needed for a "full" day
 COMPLETE_MONTH_DAYS = W.COMPLETE_MONTH_DAYS # full days for a month to count as well covered
 N_COMPARE = 3                               # compare with up to this many nearest buoys
+TH_RANGE = f"{THRESHOLDS[0]:.2f}–{THRESHOLDS[-1]:.2f} m"
+
+
+def season_names():
+    """('January–December', 'Jan–Dec') for the months analysed."""
+    a, b = SEASON[0], SEASON[-1]
+    return (f"{calendar.month_name[a]}–{calendar.month_name[b]}", f"{calendar.month_abbr[a]}–{calendar.month_abbr[b]}")
 
 # ---- plot style ------------------------------------------------------------------
 YEAR_COLOURS = {2024: "#1f5fa8", 2025: "#d9661f", 2026: "#6a3d9a"}
 EXTRA_COLOURS = ["#2a9d8f", "#b5179e", "#8c564b", "#c9a227", "#264653", "#e76f51"]
-# Lighter = lower threshold. Index 0 is > 2.00 m (lightest), last is > 3.00 m (darkest).
-WHITE_MIX = [0.74, 0.61, 0.46, 0.28, 0.0]
-GREYS = ["0.82", "0.73", "0.62", "0.50", "0.36"]
+# Lighter = lower threshold. Index 0 is > 2.00 m (lightest), last is > 4.00 m (darkest).
+# Positive: mix with white; 0: the year colour; negative: mix with black (the 3.50 and 4.00 m levels),
+# so the 2.00–3.00 m shades look the same as in the original five-threshold reports.
+WHITE_MIX = [0.74, 0.61, 0.46, 0.28, 0.0, -0.30, -0.55]
+GREYS = ["0.86", "0.79", "0.71", "0.62", "0.52", "0.40", "0.27"]
 HATCH = dict(facecolor="white", edgecolor="0.72", hatch="////", lw=0)
 
 
@@ -86,7 +97,7 @@ def year_colour(y):
 
 def shade(c, f):
     c = np.array(mpl.colors.to_rgb(c))
-    return tuple(c + (1 - c) * f)
+    return tuple(c + (1 - c) * f) if f >= 0 else tuple(c * (1 + f))
 
 
 def apply_style():
@@ -108,11 +119,12 @@ clean = W.clean
 
 
 def daily_exceedance(d, years):
-    """Daily decimal hours above each threshold, Mar–Nov of the given years."""
+    """Daily decimal hours above each threshold, for the season months of the given years."""
     t = d["time"].dt.tz_convert(None).values.astype("datetime64[m]").astype("int64")
     v = d["Hs"].values
-    g0 = np.datetime64(f"{min(years)}-03-01T00:00", "m").astype("int64")
-    g1 = np.datetime64(f"{max(years)}-12-01T00:00", "m").astype("int64")
+    g0 = np.datetime64(f"{min(years)}-{SEASON[0]:02d}-01T00:00", "m").astype("int64")
+    ye, me = (max(years) + 1, 1) if SEASON[-1] == 12 else (max(years), SEASON[-1] + 1)
+    g1 = np.datetime64(f"{ye}-{me:02d}-01T00:00", "m").astype("int64")
     grid = np.arange(g0, g1)
     j = np.searchsorted(t, grid, side="right")
     ok = (j > 0) & (j < len(t))
@@ -154,8 +166,9 @@ class _GreyRamp:
 class _GreyRampHandler:
     def legend_artist(self, legend, orig, fontsize, hb):
         x0, y0, w, h = hb.xdescent, hb.ydescent, hb.width, hb.height
-        arts = [Rectangle((x0 + k * w / 5, y0), w / 5, h, facecolor=GREYS[k], edgecolor="none",
-                          transform=hb.get_transform()) for k in range(5)]
+        n = len(GREYS)
+        arts = [Rectangle((x0 + k * w / n, y0), w / n, h, facecolor=GREYS[k], edgecolor="none",
+                          transform=hb.get_transform()) for k in range(n)]
         for a in arts:
             hb.add_artist(a)
         return arts[0]
@@ -164,7 +177,7 @@ class _GreyRampHandler:
 def draw(day, years, start, end, title, fname, bar_w, label_cov, monthly):
     cols = {y: [shade(year_colour(y), f) for f in WHITE_MIX] for y in years}
     idx = pd.date_range(start, end, freq="D")
-    fig_w, fig_h = (9, 6.4) if monthly else (11, 7.2)
+    fig_w, fig_h = (9, 6.4) if monthly else (11, 8.6)     # height per 3 years; room for the 7-level legends
     fig, axs = plt.subplots(len(years), 1, figsize=(fig_w, fig_h * len(years) / 3), sharex=True,
                             gridspec_kw={"hspace": 0.14}, squeeze=False)
     axs = axs[:, 0]
@@ -197,7 +210,7 @@ def draw(day, years, start, end, title, fname, bar_w, label_cov, monthly):
             labels.append("< 20 h of data" + (" (label:\nhours of data)" if label_cov and has_part.any() else ""))
         if np.nansum(sub["obs_h_gt_2.00"].values) > 0:
             handles.append(_GreyRamp())
-            labels.append("Measured hours on\n< 20 h days\n(> 2.00 … > 3.00 m)")
+            labels.append(f"Measured hours on\n< 20 h days\n(> {THRESHOLDS[0]:.2f} … > {THRESHOLDS[-1]:.2f} m)")
             hmap[_GreyRamp] = _GreyRampHandler()
         lg = ax.legend(handles=handles, labels=labels, handler_map=hmap, title=str(y), loc="center left",
                        bbox_to_anchor=(1.005, 0.5), frameon=False, handlelength=1.6, handleheight=0.9,
@@ -223,8 +236,11 @@ def make_figures(day, years, st, figdir):
     sid, name = st["id"], st["name"]
     ref = 2001                                   # non-leap reference year for the date axis
     season_png = figdir / f"{sid}_exceedance_season.png"
-    draw(day, years, f"{ref}-03-01", f"{ref}-11-30",
-         f"{name} buoy {sid}: daily time with significant wave height above 2.00–3.00 m, 1 Mar – 30 Nov",
+    m0, m1 = SEASON[0], SEASON[-1]
+    last1 = calendar.monthrange(ref, m1)[1]
+    draw(day, years, f"{ref}-{m0:02d}-01", f"{ref}-{m1:02d}-{last1}",
+         f"{name} buoy {sid}: daily time with significant wave height above {TH_RANGE}, "
+         f"1 {calendar.month_abbr[m0]} – {last1} {calendar.month_abbr[m1]}",
          season_png, 1.0, False, False)
     month_pngs = []
     for m in SEASON:
@@ -232,7 +248,7 @@ def make_figures(day, years, st, figdir):
         last = calendar.monthrange(ref, m)[1]
         p = figdir / f"{sid}_exceedance_{m:02d}_{nm}.png"
         draw(day, years, f"{ref}-{m:02d}-01", f"{ref}-{m:02d}-{last}",
-             f"{sid} {nm}: daily time with significant wave height above 2.00–3.00 m", p, 0.8, True, True)
+             f"{sid} {nm}: daily time with significant wave height above {TH_RANGE}", p, 0.8, True, True)
         month_pngs.append((m, p))
     return season_png, month_pngs
 
@@ -248,50 +264,105 @@ def _rng(t, col, ys, ms):
     return (min(v), max(v)) if v else (np.nan, np.nan)
 
 
-def key_results(t, years, last_obs, st, comp_text=None):
-    complete = [y for y in years if all(t.loc[(y, m), "n_days"] >= COMPLETE_MONTH_DAYS for m in SEASON)]
-    incomplete = [y for y in years if y not in complete and t.loc[y, "n_days"].sum() > 0]
-    ref = complete or years
+def key_results(t, day, years, last_obs, st, comp_text=None):
+    """Key results in groups: [(heading, [bullets]), ...], plus complete and incomplete years.
+
+    The March–November group uses the years whose March–November months are all well covered
+    (the same reference years as the original Mar–Nov reports), so its numbers do not change when
+    the winter months are added.
+    """
+    ms = [m for m in SUMMER_SEASON if m in SEASON]
+    mn_complete = [y for y in years if all(t.loc[(y, m), "n_days"] >= COMPLETE_MONTH_DAYS for m in ms)]
+    ref = mn_complete or years
     g2 = lambda y, m: t.loc[(y, m), "h_gt_2.00"]
-    out = []
+    summer = []
     ja = [y for y in years if not (pd.isna(g2(y, 7)) and pd.isna(g2(y, 8)))]
     parts = [f"{g2(y, 7):.1f} and {g2(y, 8):.1f} h/day in {y}" for y in ja
              if not pd.isna(g2(y, 7)) and not pd.isna(g2(y, 8))]
     _, mx3 = _rng(t, "h_gt_3.00", ja, [7, 8])
     if parts:
-        out.append(f"July–August is the operating window: mean time above 2 m was {_join(parts)}. "
-                   f"Time above 3 m was {mx3:.1f} h/day or less.")
+        summer.append(f"July–August is the operating window: mean time above 2 m was {_join(parts)}. "
+                      f"Time above 3 m was {mx3:.1f} h/day or less.")
     a, b = _rng(t, "h_gt_2.00", ref, [5, 6]); c, d = _rng(t, "h_gt_3.00", ref, [5, 6])
-    out.append(f"May–June is usable but has multi-day rough spells: {a:.1f}–{b:.1f} h/day above 2 m in "
-               f"{_join(map(str, ref))}, and {c:.1f}–{d:.1f} h/day above 3 m.")
+    summer.append(f"May–June is usable but has multi-day rough spells: {a:.1f}–{b:.1f} h/day above 2 m in "
+                  f"{_join(map(str, ref))}, and {c:.1f}–{d:.1f} h/day above 3 m.")
     a, b = _rng(t, "h_gt_2.00", ref, [3, 10, 11]); c, d = _rng(t, "h_gt_3.00", ref, [3, 10, 11])
-    out.append(f"March, October and November are mostly lost: {a:.1f}–{b:.1f} h/day above 2 m and "
-               f"{c:.1f}–{d:.1f} h/day above 3 m in {_join(map(str, ref))}.")
+    summer.append(f"March, October and November are mostly lost: {a:.1f}–{b:.1f} h/day above 2 m and "
+                  f"{c:.1f}–{d:.1f} h/day above 3 m in {_join(map(str, ref))}.")
     sep = [(y, g2(y, 9)) for y in years if not pd.isna(g2(y, 9))]
     if sep:
-        out.append("September (time above 2 m): " + _join([f"{v:.1f} h/day in {y}" for y, v in sep]) + ".")
+        summer.append("September (time above 2 m): " + _join([f"{v:.1f} h/day in {y}" for y, v in sep]) + ".")
+    groups = [("March–November", summer)]
+    if all(m in SEASON for m in WINTER):
+        groups.append(("December–February", winter_text(t, day, years, ja)))
+
+    complete = [y for y in years if all(t.loc[(y, m), "n_days"] >= COMPLETE_MONTH_DAYS for m in SEASON)]
+    incomplete = [y for y in years if y not in complete and t.loc[y, "n_days"].sum() > 0]
     lo_c, hi_c = (min(t.loc[(y, m), "n_days"] for y in complete for m in SEASON),
                   max(t.loc[(y, m), "n_days"] for y in complete for m in SEASON)) if complete else (None, None)
+    cov = []
     for y in incomplete:
         nd = {m: int(t.loc[(y, m), "n_days"]) for m in SEASON}
         have = [v for v in nd.values() if v > 0]
         none = [calendar.month_name[m] for m, v in nd.items() if v == 0]
         thin = [calendar.month_name[m] for m, v in nd.items() if 0 < v < COMPLETE_MONTH_DAYS]
-        s = f"{y} is incomplete"
-        if thin:
-            s += f": months with fewer than {COMPLETE_MONTH_DAYS} full days are {_join(thin)}"
+        x = f"{y} is incomplete"
+        if len(thin) == 1:
+            x += f": the only month with fewer than {COMPLETE_MONTH_DAYS} full days is {thin[0]}"
+        elif thin:
+            x += f": months with fewer than {COMPLETE_MONTH_DAYS} full days are {_join(thin)}"
         if none and last_obs is not None and last_obs.year == y and last_obs.month in SEASON:
-            s += f"{',' if thin else ':'} and there is no data after {last_obs.day} {calendar.month_name[last_obs.month]}"
-        s += (f". In the monthly summary table (page 2), its values rest on {min(have)}–{max(have)} full days per month"
+            x += f"{',' if thin else ':'} and there is no data after {last_obs.day} {calendar.month_name[last_obs.month]}"
+        x += (f". In the monthly summary table, its values rest on {min(have)}–{max(have)} full days per month"
               + (f" (none in {_join(none)})" if none else "")
               + (f", against {lo_c}–{hi_c} in {_join(map(str, complete))}" if complete else "")
               + ", so weight them accordingly.")
-        out.append(s)
+        cov.append(x)
     if complete and not incomplete:
-        out.append(f"The record is complete: every month has {lo_c}–{hi_c} full days.")
+        cov.append(f"The record is complete: every month has {lo_c}–{hi_c} full days.")
     if comp_text:
-        out.append(comp_text)
-    return out + st.get("report", {}).get("key_results_extra", []), complete, incomplete
+        cov.append(comp_text)
+    cov += st.get("report", {}).get("key_results_extra", [])
+    groups.append(("Data coverage and other buoys", cov))
+    return groups, complete, incomplete
+
+
+def winter_text(t, day, years, ja):
+    """December–February bullets, one value per winter (Dec of one year + Jan, Feb of the next).
+
+    A winter is used when all three months have at least COMPLETE_MONTH_DAYS full days; when the
+    record starts in January, a well-covered January–February is shown on its own. Means are over
+    the full days of those months (daily table, not the rounded monthly means).
+    """
+    full = day[day["h_gt_2.00"].notna()]
+    ok = lambda y, m: (y, m) in t.index and t.loc[(y, m), "n_days"] >= COMPLETE_MONTH_DAYS
+    rows = []
+    for y in years:
+        months = [(y - 1, 12), (y, 1), (y, 2)]
+        good = [k for k in months if ok(*k)]
+        if len(good) == 3:
+            label = f"{y - 1}–{str(y)[2:]}"
+        elif good == [(y, 1), (y, 2)]:
+            label = f"January–February {y}"
+        else:
+            continue
+        sel = full[[(d.year, d.month) in good for d in full.index]]
+        rows.append((label, {th: sel[f"h_gt_{th:.2f}"].mean() for th in (2.0, 3.0, 4.0)}))
+    if not rows:
+        return [f"No December–February period has at least {COMPLETE_MONTH_DAYS} full days of data in every month yet."]
+    lab = lambda r: r[0] if r[0][0].isalpha() else f"winter {r[0]}"
+    per = _join([f"{r[1][2.0]:.1f}, {r[1][3.0]:.1f} and {r[1][4.0]:.1f} h/day in {lab(r)}" for r in rows])
+    out = [f"Winter is the roughest part of the year. Mean time above 2, 3 and 4 m was {per}."]
+    wm = [(y, m, t.loc[(y, m), "h_gt_2.00"]) for y in years for m in WINTER if ok(y, m)]
+    if wm:
+        y, m, v = min(wm, key=lambda q: q[2])
+        lo, hi = _rng(t, "h_gt_2.00", ja, [7, 8])
+        x = (f"No well-covered winter month averaged less than {v:.1f} h/day above 2 m "
+             f"(the lowest was {calendar.month_name[m]} {y})")
+        if not pd.isna(lo):
+            x += f", against monthly means of {lo:.1f}–{hi:.1f} h/day in July–August"
+        out.append(x + ".")
+    return out
 
 
 def method_text(d, df_raw, st, last_obs, scr=None):
@@ -326,21 +397,26 @@ def method_text(d, df_raw, st, last_obs, scr=None):
         " ".join([qc] + ([screening_text(scr)] if scr else []) + st.get("report", {}).get("data_notes", [])),
         removed,
         "Hs is linearly interpolated between samples (across gaps of at most 2 h). The time above each threshold "
-        "(2.00, 2.25, 2.50, 2.75, 3.00 m) is then summed per UTC day, in decimal hours. Exceedances that start "
-        "and end between two readings are missed, so precision finer than about half an hour is nominal.",
+        f"({', '.join(f'{th:.2f}' for th in THRESHOLDS)} m) is then summed per UTC day, in decimal hours. "
+        "Exceedances that start and end between two readings are missed, so precision finer than about half an "
+        "hour is nominal.",
         f"Full days (at least {FULL_DAY_H} h covered) are scaled to 24 h by the covered fraction and drawn in the year colour.",
         f"Partial days (less than {FULL_DAY_H} h covered) are hatched. The hours actually measured above each threshold "
         "on those days are drawn in nested greys, not scaled up. In the monthly figures each partial day is labelled "
         "with its hours of data. Partial days are not included in the monthly summary table.",
-        "Each bar shows all five thresholds nested. The darkest shade is the time above 3.00 m; progressively lighter "
-        "bands show the time above 2.75, 2.50, 2.25 and 2.00 m, so the full bar height is the time above 2.00 m.",
+        f"Each bar shows all {len(THRESHOLDS)} thresholds nested. The darkest shade is the time above "
+        f"{THRESHOLDS[-1]:.2f} m; progressively lighter bands show the time above "
+        + _join([f"{th:.2f}" for th in THRESHOLDS[-2::-1]]) + f" m, so the full bar height is the time above "
+        f"{THRESHOLDS[0]:.2f} m. The 3.50 and 4.00 m bands are darker than the year colour.",
+        "The daily figures use a common 365-day axis, so 29 February 2024 is not drawn; it is included in the "
+        "monthly summary table and the CSV files.",
     ]
 
 
 def caveats_text(years, incomplete, st, cov=None):
     n = len(years)
     part = f", {len(incomplete)} of them partial" if incomplete else ""
-    return [f"Only {n} season{'s' if n != 1 else ''}{part}. Treat monthly means as indicative.",
+    return [f"Only {n} year{'s' if n != 1 else ''} of data{part}. Treat monthly means as indicative.",
             *gap_text(cov),
             *st.get("report", {}).get("caveats_extra", []),
             "Grey (partial-day) values are lower bounds: they count only the hours that were measured.",
@@ -389,14 +465,18 @@ def comparison_text(st, comps, stations_by_id):
 
 
 # ---- PDF ---------------------------------------------------------------------------
-def build_pdf(fn, st, years, t, kr, method, cav, season_png, month_pngs):
+def build_pdf(fn, st, years, t, kr_groups, method, cav, season_png, month_pngs):
     ss = getSampleStyleSheet()
     H1 = ParagraphStyle("h1", parent=ss["Title"], fontSize=15, leading=18, alignment=0, spaceAfter=4)
-    H2 = ParagraphStyle("h2", parent=ss["Heading2"], fontSize=11.5, leading=14, spaceBefore=6, spaceAfter=3)
+    H2 = ParagraphStyle("h2", parent=ss["Heading2"], fontSize=11.5, leading=14, spaceBefore=6, spaceAfter=3,
+                        keepWithNext=1)
     B = ParagraphStyle("b", parent=ss["BodyText"], fontSize=9.2, leading=12)
     BL = ParagraphStyle("bl", parent=B, leftIndent=10, bulletIndent=0)
     CAP = ParagraphStyle("cap", parent=B, fontSize=8.2, leading=10, textColor=colors.HexColor("#444444"))
     bullets = lambda L: [Paragraph(x, BL, bulletText="•") for x in L]
+    H3 = ParagraphStyle("h3", parent=B, fontName="Helvetica-Bold", spaceBefore=4, spaceAfter=1, keepWithNext=1)
+    kr = [z for head, L in kr_groups if L for z in [Paragraph(head, H3), *bullets(L)]]
+    long_name, short_name = season_names()
 
     def img(p, w):
         iw, ih = PILImage.open(p).size
@@ -407,20 +487,20 @@ def build_pdf(fn, st, years, t, kr, method, cav, season_png, month_pngs):
     yrs_txt = _join([f"{y} ({'blue' if y == 2024 else 'orange' if y == 2025 else 'purple' if y == 2026 else 'colour key'})"
                      for y in years])
     fmt = lambda v: "–" if pd.isna(v) else f"{v:.1f}"
-    hdr = (["Month"] + [f"{y}\n>2 m" for y in years] + [f"{y}\n>3 m" for y in years] + [f"n {y}" for y in years])
+    TCOLS = (2.0, 3.0, 4.0)                      # thresholds shown in the monthly table
+    hdr = (["Month"] + [f"{y}\n>{th:g} m" for th in TCOLS for y in years] + [f"n {y}" for y in years])
     rows = [hdr] + [[calendar.month_abbr[m]]
-                    + [fmt(t.loc[(y, m), "h_gt_2.00"]) for y in years]
-                    + [fmt(t.loc[(y, m), "h_gt_3.00"]) for y in years]
+                    + [fmt(t.loc[(y, m), f"h_gt_{th:.2f}"]) for th in TCOLS for y in years]
                     + [str(int(t.loc[(y, m), "n_days"])) for y in years] for m in SEASON]
     ny = len(years)
-    vw = min(0.62, (7.2 - 0.6) / (2 * ny + 0.8 * ny)) * inch
-    tbl = Table(rows, colWidths=[0.6 * inch] + [vw] * (2 * ny) + [0.8 * vw] * ny)
+    vw = min(0.62, (7.2 - 0.6) / (len(TCOLS) * ny + 0.8 * ny)) * inch
+    tbl = Table(rows, colWidths=[0.6 * inch] + [vw] * (len(TCOLS) * ny) + [0.8 * vw] * ny)
     style = [("FONT", (0, 0), (-1, -1), "Helvetica", 8.5), ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 8.5),
              ("ALIGN", (1, 0), (-1, -1), "CENTER"), ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.black),
              ("LINEBELOW", (0, -1), (-1, -1), 0.6, colors.black), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
              ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f4f4")])]
     for k, y in enumerate(years):
-        for c in (1 + k, 1 + ny + k):
+        for c in [1 + j * ny + k for j in range(len(TCOLS))]:
             style.append(("TEXTCOLOR", (c, 0), (c, 0), colors.HexColor(year_colour(y))))
     tbl.setStyle(TableStyle(style))
 
@@ -428,26 +508,28 @@ def build_pdf(fn, st, years, t, kr, method, cav, season_png, month_pngs):
         c.setFont("Helvetica", 7.5)
         c.setFillColor(colors.grey)
         c.drawString(0.6 * inch, 0.45 * inch,
-                     f"{sid} {name} wave exceedance, Mar–Nov {y0}–{y1} · data: DFO MEDS via CIOOS Pacific ERDDAP")
+                     f"{sid} {name} wave exceedance, {short_name} {y0}–{y1} · data: DFO MEDS via CIOOS Pacific ERDDAP")
         c.drawRightString(letter[0] - 0.6 * inch, 0.45 * inch, f"{doc.page}")
 
-    s = [Paragraph(f"Wave-height exceedance at {name} (buoy {sid}), March–November {y0}–{y1}", H1),
+    s = [Paragraph(f"Wave-height exceedance at {name} (buoy {sid}), {long_name} {y0}–{y1}", H1),
          Paragraph("Purpose: estimate how much of each day is lost to sea state, to help size the weather-day "
                    "allowance in ship-time requests off the west coast of Vancouver Island.", B),
-         Paragraph("Key results", H2), *bullets(kr), Spacer(1, 6), img(season_png, 7.0 * inch),
-         Paragraph(f"Figure 1. Daily time with Hs above 2.00–3.00 m, 1 March – 30 November, for {yrs_txt}. "
-                   "Darkest band: time above 3.00 m; full bar: time above 2.00 m. Hatched: less than 20 h of data; "
-                   "grey bars on those days are the measured hours above each threshold (not scaled).", CAP),
-         PageBreak(), Paragraph("Monthly summary", H2),
-         Paragraph("Mean decimal hours per day with Hs above 2.00 m and above 3.00 m, over full days only "
-                   f"(at least {FULL_DAY_H} h of data), with the number of full days (n). The values for all five "
-                   "thresholds are in the accompanying CSV.", B), Spacer(1, 4), tbl, Spacer(1, 6),
+         Paragraph("Key results", H2), *kr, Spacer(1, 6), img(season_png, 7.0 * inch),
+         Paragraph(f"Figure 1. Daily time with Hs above {TH_RANGE}, 1 {calendar.month_name[SEASON[0]]} – "
+                   f"{calendar.monthrange(2001, SEASON[-1])[1]} {calendar.month_name[SEASON[-1]]}, for {yrs_txt}. "
+                   f"Darkest band: time above {THRESHOLDS[-1]:.2f} m; full bar: time above {THRESHOLDS[0]:.2f} m. "
+                   "Hatched: less than 20 h of data; grey bars on those days are the measured hours above each "
+                   "threshold (not scaled).", CAP),
+         Spacer(1, 8), Paragraph("Monthly summary", H2),
+         Paragraph("Mean decimal hours per day with Hs above 2 m, 3 m and 4 m, over full days only "
+                   f"(at least {FULL_DAY_H} h of data), with the number of full days (n). The values for all "
+                   f"{len(THRESHOLDS)} thresholds are in the accompanying CSV.", B), Spacer(1, 4), tbl, Spacer(1, 6),
          Paragraph("Data and method", H2), *bullets(method), Paragraph("Caveats", H2), *bullets(cav),
          PageBreak(), Paragraph("Monthly detail", H2)]
     for i, (m, p) in enumerate(month_pngs):
         s.append(KeepTogether([img(p, 6.6 * inch),
                                Paragraph(f"Figure {i + 2}. {calendar.month_name[m]}: daily time with Hs above "
-                                         f"2.00–3.00 m, {y0}–{y1}. Darkest band: above 3.00 m. Hatched: less than "
+                                         f"{TH_RANGE}, {y0}–{y1}. Darkest band: above {THRESHOLDS[-1]:.2f} m. Hatched: less than "
                                          "20 h of data; grey: measured hours on those days; rotated labels give the "
                                          "hours of data.", CAP), Spacer(1, 8)]))
     SimpleDocTemplate(str(fn), pagesize=letter, leftMargin=0.6 * inch, rightMargin=0.6 * inch,
@@ -481,7 +563,7 @@ def run_station(st, data, out, pdf_dir, stations_by_id):
                      key=lambda o: W.distance_km((st["lat"], st["lon"]), (o["lat"], o["lon"])))[:N_COMPARE]
     comps = {o["id"]: c for o in nearest if (c := W.compare(h, data[o["id"]][2]))}
     scr = W.screen(df_raw, d)
-    kr, complete, incomplete = key_results(t, years, last_obs, st, comparison_text(st, comps, stations_by_id))
+    kr, complete, incomplete = key_results(t, day, years, last_obs, st, comparison_text(st, comps, stations_by_id))
     method = method_text(d, df_raw, st, last_obs, scr)
     cav = caveats_text(years, incomplete, st, cov)
     (root / "report").mkdir(parents=True, exist_ok=True)
@@ -490,7 +572,7 @@ def run_station(st, data, out, pdf_dir, stations_by_id):
     pdf_dir.mkdir(parents=True, exist_ok=True)
     fixed = pdf_dir / f"{sid}_wave_exceedance_report.pdf"
     fixed.write_bytes(pdf.read_bytes())
-    print(f"  years {years}; complete seasons {complete}; report -> {fixed}")
+    print(f"  years {years}; complete years {complete}; report -> {fixed}")
     return fixed
 
 
@@ -498,7 +580,7 @@ RECORD_START = "2024-01-01"
 
 
 def main(argv=None):
-    global RECORD_START
+    global RECORD_START, SEASON
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("stations", nargs="*", help="station ids to report on (default: all in stations.json)")
     ap.add_argument("--config", default=str(ROOT / "stations.json"))
@@ -509,6 +591,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     cfg = json.loads(Path(a.config).read_text())
     RECORD_START = cfg["record_start"]
+    SEASON = range(cfg["season"]["first_month"], cfg["season"]["last_month"] + 1)
     sts = [s for s in cfg["stations"] if not a.stations or s["id"] in a.stations]
     if not sts:
         sys.exit(f"no matching stations in {a.config}")

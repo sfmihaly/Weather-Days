@@ -5,8 +5,8 @@
 
   // ---- settings that are easy to change -----------------------------------
   const CONFIG = {
-    limitMin: 2.0, limitMax: 3.0, limitStep: 0.05, limitDefault: 2.5,
-    curveMin: 1.0, curveMax: 4.0, curveStep: 0.1,    // x range of the sensitivity plot
+    limitMin: 2.0, limitMax: 5.0, limitStep: 0.05, limitDefault: 2.5,
+    curveMin: 1.0, curveMax: 6.0, curveStep: 0.1,    // x range of the sensitivity plot
     partialFrac: 0.8,                                 // flag rows with less data than this
     maxDays: 120,
     fullDayH: 20,                                     // overview: a day counts if it has this many hours of data
@@ -46,6 +46,10 @@
   const SEASON_START = Date.UTC(REF_YEAR, firstMonth - 1, 1);
   const SEASON_END = Date.UTC(REF_YEAR, lastMonth, 1);          // exclusive
   const SEASON_DAYS = Math.round((SEASON_END - SEASON_START) / C.DAY);
+  const WRAPS = lastMonth >= 12 && firstMonth === 1;            // windows may run past 31 Dec into January
+  const LAST_DAY_TXT = `${daysInMonth(REF_YEAR, lastMonth)} ${MONTHS[lastMonth - 1]}`;
+  /** Day k of the shared axis, in a given year (by calendar month and day, so 29 Feb never shifts the rest). */
+  const dayIn = (y, k) => { const r = new Date(SEASON_START + k * C.DAY); return Date.UTC(y, r.getUTCMonth(), r.getUTCDate()); };
 
   // ---- controls --------------------------------------------------------------
   const el = id => document.getElementById(id);
@@ -119,7 +123,8 @@
     const note = el("windowNote");
     note.className = "note" + (w.clipped ? " warn" : "");
     note.textContent = `Window: ${fmtDate(w.start)} – ${fmtDate(w.end - 1)} (${days} days), evaluated in ${years.join(", ")}.` +
-      (w.clipped ? ` The cruise runs past 30 November; only the days up to 30 November are evaluated.` : "");
+      (w.clipped ? ` The cruise runs past ${LAST_DAY_TXT}; only the days up to ${LAST_DAY_TXT} are evaluated.` : "") +
+      (w.wraps ? ` The window continues into January of the following year.` : "");
     return days;
   }
 
@@ -201,13 +206,12 @@
   }
 
   // ---- overview: average daily hours above the limit, with a draggable cruise window ----
-  /** Daily mean (over selected buoys and all years) of hours with Hs above the limit, Mar–Nov. */
+  /** Daily mean (over selected buoys and all years) of hours with Hs above the limit, for each day of the season. */
   function overviewData(inp) {
     const sum = new Float64Array(SEASON_DAYS), cnt = new Int32Array(SEASON_DAYS);
     for (const st of inp.sel) for (const y of years) {
-      const y0 = Date.UTC(y, firstMonth - 1, 1);
       for (let k = 0; k < SEASON_DAYS; k++) {
-        const a = y0 + k * C.DAY;
+        const a = dayIn(y, k);
         const ex = C.exceedance(st.series, a, a + C.DAY, inp.limit);
         if (ex.coverage_h >= CONFIG.fullDayH) { sum[k] += 24 * ex.above_h / ex.coverage_h; cnt[k]++; }
       }
@@ -216,20 +220,25 @@
     const half = Math.floor(CONFIG.runDays / 2), need = Math.ceil(CONFIG.runDays / 2);
     const run = mean.map((_, k) => {
       let s = 0, n = 0;
-      for (let j = Math.max(0, k - half); j <= Math.min(SEASON_DAYS - 1, k + half); j++) if (mean[j] !== null) { s += mean[j]; n++; }
+      const lo = WRAPS ? k - half : Math.max(0, k - half), hi = WRAPS ? k + half : Math.min(SEASON_DAYS - 1, k + half);
+      for (let i = lo; i <= hi; i++) {                     // whole year: the mean wraps from 31 Dec to 1 Jan
+        const j = (i + SEASON_DAYS) % SEASON_DAYS;
+        if (mean[j] !== null) { s += mean[j]; n++; }
+      }
       return n >= need ? s / n : null;
     });
     return { mean, run, cnt: Array.from(cnt) };
   }
 
-  let rendering = false;
+  let rendering = false, lastShape = null;
   function renderOverview(inp) {
     const div = el("overviewPlot");
     const ov = overviewData(inp);
     const w = C.cruiseWindow(REF_YEAR, inp.m, inp.d, inp.n, lastMonth);
     const xs = ov.mean.map((_, k) => pdate(SEASON_START + k * C.DAY + C.DAY / 2));
     const k0 = Math.round((w.start - SEASON_START) / C.DAY), k1 = Math.round((w.end - SEASON_START) / C.DAY);
-    const inWin = ov.mean.slice(k0, k1).filter(v => v !== null);
+    const inWin = [];
+    for (let k = k0; k < k1; k++) { const v = ov.mean[k % SEASON_DAYS]; if (v !== null) inWin.push(v); }
     const winMean = inWin.length ? inWin.reduce((a, b) => a + b, 0) / inWin.length : null;
     const nDays = k1 - k0;
     const label = winMean === null ? "no data" :
@@ -240,13 +249,23 @@
       { x: xs, y: ov.run, type: "scatter", mode: "lines", name: `${CONFIG.runDays}-day running mean`,
         line: { color: "#1d2733", width: 2.4 }, connectgaps: false, hoverinfo: "skip" },
     ];
+    // The window as drawn: one shape, or two when it runs past 31 Dec (the second, at the start of the
+    // axis, is dotted and not draggable). lastShape remembers the draggable one for onOverviewDrag.
+    const aEnd = Math.min(w.end, SEASON_END);
+    const winShape = (x0, x1, edit) => ({ type: "rect", xref: "x", yref: "paper", x0: pdate(x0), x1: pdate(x1), y0: 0, y1: 1,
+      fillcolor: "rgba(242,193,78,0.30)", line: { color: "#b8860b", width: 1.5, dash: edit ? "solid" : "dot" },
+      editable: edit, layer: "below" });
+    const shapes = [winShape(w.start, aEnd, true)];
+    if (w.end > SEASON_END) shapes.push(winShape(SEASON_START, SEASON_START + (w.end - SEASON_END), false));
+    lastShape = { x0: w.start, x1: aEnd };
+    const labX = (w.end > SEASON_END && w.end - SEASON_END > aEnd - w.start)
+      ? SEASON_START + (w.end - SEASON_END) / 2 : (w.start + aEnd) / 2;
     const layout = {
       height: 330, margin: { l: 55, r: 20, t: 10, b: 40 }, bargap: 0,
       xaxis: { type: "date", tickformat: "%b", dtick: "M1", range: [pdate(SEASON_START), pdate(SEASON_END)], fixedrange: true },
       yaxis: { title: { text: `Hours above ${inp.limit.toFixed(2)} m per day` }, range: [0, 24.5], tickvals: [0, 6, 12, 18, 24], fixedrange: true },
-      shapes: [{ type: "rect", xref: "x", yref: "paper", x0: pdate(w.start), x1: pdate(w.end), y0: 0, y1: 1,
-                 fillcolor: "rgba(242,193,78,0.30)", line: { color: "#b8860b", width: 1.5 }, editable: true, layer: "below" }],
-      annotations: [{ xref: "x", yref: "paper", x: pdate((w.start + w.end) / 2), y: 1, yanchor: "top", showarrow: false,
+      shapes,
+      annotations: [{ xref: "x", yref: "paper", x: pdate(labX), y: 1, yanchor: "top", showarrow: false,
                       text: label, font: { size: 11, color: "#6b4e00" }, bgcolor: "rgba(255,255,255,0.75)" }],
       legend: { orientation: "h", x: 0, y: -0.14 }, hovermode: "closest", dragmode: false,
     };
@@ -264,14 +283,21 @@
     if (x0 === undefined && x1 === undefined) return;
     const inp = readInputs();
     const cur = C.cruiseWindow(REF_YEAR, inp.m, inp.d, inp.n, lastMonth);
-    const t0 = x0 !== undefined ? parsePdate(x0) : cur.start, t1 = x1 !== undefined ? parsePdate(x1) : cur.end;
-    let s = Math.round((Math.min(t0, t1) - SEASON_START) / C.DAY), e = Math.round((Math.max(t0, t1) - SEASON_START) / C.DAY);
+    const prev = lastShape || { x0: cur.start, x1: Math.min(cur.end, SEASON_END) };
+    const t0 = x0 !== undefined ? parsePdate(x0) : prev.x0, t1 = x1 !== undefined ? parsePdate(x1) : prev.x1;
+    const d0 = Math.round((t0 - prev.x0) / C.DAY), d1 = Math.round((t1 - prev.x1) / C.DAY);
+    const sCur = Math.round((cur.start - SEASON_START) / C.DAY);
+    let s, n;
+    if (d0 === 0 && d1 === 0) return;
+    if (d0 === d1) { s = sCur + d0; n = inp.n; }                 // whole window moved: keep its length
+    else if (d0 !== 0) { s = sCur + d0; n = inp.n - d0; }        // left edge moved: keep the end date
+    else { s = sCur; n = Math.round((t1 - cur.start) / C.DAY); } // right edge moved: end where it was dropped
     s = Math.min(Math.max(s, 0), SEASON_DAYS - 1);
-    e = Math.min(Math.max(e, s + 1), SEASON_DAYS, s + CONFIG.maxDays);
+    n = Math.min(Math.max(n, 1), CONFIG.maxDays, WRAPS ? Infinity : SEASON_DAYS - s);
     const d = new Date(SEASON_START + s * C.DAY);
     startMonth.value = d.getUTCMonth() + 1;
     startDay.value = d.getUTCDate();
-    nDaysIn.value = e - s;
+    nDaysIn.value = n;
     update();
   }
 

@@ -36,7 +36,7 @@
     </div>
     <div class="field">
       <label for="limit">Hs limit: <output id="limitOut"></output> m</label>
-      <input id="limit" type="range" min="2" max="3" step="0.05" value="2.5">
+      <input id="limit" type="range" min="2" max="5" step="0.05" value="2.5">
     </div>
     <div class="field">
       <span class="label">Buoys</span>
@@ -78,8 +78,9 @@
 
   <section aria-label="Reports">
     <h2>Reports</h2>
-    <p class="note">A PDF report for each buoy: the March–November daily time above 2.00–3.00 m for every
-      year, monthly summaries, data quality and comparison with the other buoys. Rebuilt every week with the data.</p>
+    <p class="note">A PDF report for each buoy: the daily time above 2.00–4.00 m through the year (January–December)
+      for every year, monthly summaries, summaries for March–November and for winter (December–February), data
+      quality and comparison with the other buoys. Rebuilt every week with the data.</p>
     <ul id="reportLinks" class="reports"></ul>
   </section>
 
@@ -93,7 +94,8 @@
       <li>Values flagged erroneous or off-position, and values outside 0.2–20 m, are removed.</li>
       <li>Hs is interpolated linearly between hourly samples across gaps of up to 2 h; longer gaps are
         treated as missing. Exceedances that start and end between two hourly readings are not seen.</li>
-      <li>Dates are in UTC. Cruise windows are limited to the March–November season analysed.</li>
+      <li>Dates are in UTC. A cruise that starts in December may run into January; that part is evaluated
+        with the January data of the following year.</li>
       <li>This is a planning aid based on a short record (from 2024), not a forecast.</li>
     </ul>
   </details>

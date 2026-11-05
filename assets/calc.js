@@ -29,12 +29,15 @@
     return lo;
   }
 
-  /** Cruise window in a given year: [start, end) in ms UTC, clipped to the season end. */
+  /** Cruise window in a given year: [start, end) in ms UTC.
+   *  With a season ending before December the window is clipped to the season end. With a season
+   *  running to 31 December it is not clipped: a December cruise continues into the next January. */
   function cruiseWindow(year, month, day, nDays, lastMonth) {
     const start = Date.UTC(year, month - 1, day);
+    const full = start + nDays * DAY;
+    if (lastMonth >= 12) return { start, end: full, clipped: false, wraps: full > Date.UTC(year + 1, 0, 1) };
     const seasonEnd = Date.UTC(year, lastMonth, 1);          // 00:00 on the 1st of the month after lastMonth
-    const end = Math.min(start + nDays * DAY, seasonEnd);
-    return { start, end, clipped: start + nDays * DAY > seasonEnd };
+    return { start, end: Math.min(full, seasonEnd), clipped: full > seasonEnd, wraps: false };
   }
 
   /** Hours of data and hours with Hs > limit inside [a, b). */
